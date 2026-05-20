@@ -991,6 +991,19 @@
     transform: translateX(0);
   }
 
+  /* Disable glass-card hover transforms on sidebar on mobile */
+  .sidebar.glass-card:hover {
+    transform: translateX(-100%);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    border-color: var(--border-color);
+  }
+
+  .sidebar.glass-card.mobile-open:hover {
+    transform: translateX(0);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    border-color: var(--border-color);
+  }
+
   .sidebar-overlay {
     display: block;
     position: fixed;
@@ -1013,8 +1026,11 @@
   }
 
   .logo-section {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     margin-bottom: 32px;
+    width: 100%;
   }
 
   .logo-wrapper {
@@ -1024,18 +1040,24 @@
   }
 
   .sidebar-close-btn {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
     border: none;
     color: var(--text-muted);
-    padding: 6px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    pointer-events: auto !important;
+    flex-shrink: 0;
+    z-index: 1010;
   }
 
   .sidebar-close-btn:hover {
     color: var(--text-main);
+    background: rgba(255, 255, 255, 0.15);
   }
 
   /* Section headers and details styling on mobile */

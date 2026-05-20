@@ -62,7 +62,7 @@ function App() {
             <FlaskConical className="logo-icon" />
             <span className="logo-text">AURA</span>
           </div>
-          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+          <button type="button" className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
             <X size={20} />
           </button>
         </div>
