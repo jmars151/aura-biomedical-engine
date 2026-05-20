@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, User, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, LayoutDashboard, Database, Activity, Settings, User, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
@@ -17,6 +17,7 @@ function App() {
   const [showComparison, setShowComparison] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
   const [showProfile, setShowProfile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const addToComparison = (item) => {
     if (comparisonList.length >= 4) return;
@@ -48,11 +49,22 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Sidebar Overlay backdrop for mobile */}
+      <div 
+        className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`} 
+        onClick={() => setSidebarOpen(false)}
+      ></div>
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar glass-card">
+      <aside className={`sidebar glass-card ${sidebarOpen ? 'mobile-open' : ''}`}>
         <div className="logo-section">
-          <FlaskConical className="logo-icon" />
-          <span className="logo-text">AURA</span>
+          <div className="logo-wrapper">
+            <FlaskConical className="logo-icon" />
+            <span className="logo-text">AURA</span>
+          </div>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
         
         <nav className="nav-menu">
@@ -60,25 +72,25 @@ function App() {
             icon={<LayoutDashboard size={20} />} 
             label="Dashboard" 
             active={activeView === 'dashboard'} 
-            onClick={() => { setActiveView('dashboard'); setShowComparison(false); setSelectedItem(null); }}
+            onClick={() => { setActiveView('dashboard'); setShowComparison(false); setSelectedItem(null); setSidebarOpen(false); }}
           />
           <NavItem 
             icon={<Database size={20} />} 
             label="Library" 
             active={activeView === 'library'}
-            onClick={() => setActiveView('library')}
+            onClick={() => { setActiveView('library'); setSidebarOpen(false); }}
           />
           <NavItem 
             icon={<Activity size={20} />} 
             label="Trials" 
             active={activeView === 'trials'}
-            onClick={() => setActiveView('trials')}
+            onClick={() => { setActiveView('trials'); setSidebarOpen(false); }}
           />
           <NavItem 
             icon={<Settings size={20} />} 
             label="Settings" 
             active={activeView === 'settings'}
-            onClick={() => setActiveView('settings')}
+            onClick={() => { setActiveView('settings'); setSidebarOpen(false); }}
           />
         </nav>
 
@@ -110,6 +122,48 @@ function App() {
 
       {/* Main Content Area */}
       <main className="main-content">
+        {/* Mobile Header */}
+        <div className="mobile-header glass-header">
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>
+            <Menu size={24} />
+          </button>
+          <div className="mobile-logo">
+            <FlaskConical className="logo-icon" size={20} />
+            <span className="logo-text">AURA</span>
+          </div>
+          <div className="mobile-actions">
+            {comparisonList.length > 0 && (
+              <button 
+                className={`comparison-toggle-mini glass-card ${showComparison ? 'active' : ''}`}
+                onClick={() => {
+                  setShowComparison(!showComparison);
+                  setResults(null);
+                  setSearchQuery('');
+                }}
+              >
+                <Activity size={16} />
+                <span className="compare-count">{comparisonList.length}</span>
+              </button>
+            )}
+            <div className="mobile-profile-trigger" onClick={() => setShowProfile(!showProfile)}>
+              <User size={18} />
+            </div>
+            {showProfile && (
+              <div className="profile-popover glass-card mobile-popover animate-fade-in">
+                <div className="popover-header">
+                  <h3>Admin Settings</h3>
+                </div>
+                <div className="popover-content">
+                  <div className="popover-item"><Settings size={14} /> Account Settings</div>
+                  <div className="popover-item"><FlaskConical size={14} /> My Experiments</div>
+                  <div className="divider"></div>
+                  <div className="popover-item logout">Log Out</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <header className="glass-header top-bar">
           <div className="search-wrapper">
             <div className="search-container glass-card glow-border">

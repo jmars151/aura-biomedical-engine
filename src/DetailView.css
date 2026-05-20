@@ -130,3 +130,42 @@
   border-radius: 2px;
   box-shadow: 0 0 10px var(--accent-primary);
 }
+
+/* Responsive adjustments for DetailView */
+@media (max-width: 768px) {
+  .detail-view {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .detail-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .detail-title-row .external-link {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .detail-info-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .bioactivity-grid {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+  }
+
+  .bio-value {
+    font-size: 14px;
+  }
+
+  .detail-visualizer {
+    height: 200px;
+  }
+}
+

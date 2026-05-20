@@ -1,4 +1,3 @@
-import React from 'react';
 import './BindingVisualizer.css';
 
 const BindingVisualizer = () => {

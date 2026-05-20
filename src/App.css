@@ -800,3 +800,321 @@
   font-weight: 700;
   color: var(--accent-secondary);
 }
+
+/* Responsive Styles & Mobile Friendliness */
+
+/* Hide mobile-specific elements on desktop by default */
+.mobile-header,
+.sidebar-overlay,
+.sidebar-close-btn,
+.comparison-toggle-mini {
+  display: none;
+}
+
+/* Tablet view styling: <= 1024px */
+@media (max-width: 1024px) {
+  .grid-layout {
+    grid-template-columns: 1fr; /* Stack main visualizer and insights list */
+    gap: 20px;
+  }
+
+  .main-content {
+    padding: 16px 20px 24px 20px; /* Reduce padding slightly */
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+/* Mobile view styling: <= 768px */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Sticky mobile top header */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(10, 10, 12, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .hamburger-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .hamburger-btn:active {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-logo .logo-icon {
+    color: var(--accent-primary);
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.4));
+  }
+
+  .mobile-logo .logo-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+  }
+
+  .mobile-profile-trigger {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+  }
+
+  /* Redefined popover for mobile header actions */
+  .mobile-actions .mobile-popover {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    left: auto;
+    bottom: auto;
+    width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background: var(--bg-card);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+  }
+
+  /* Comparison toggle mini button for mobile */
+  .comparison-toggle-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: var(--accent-primary);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .comparison-toggle-mini.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: var(--glow-shadow);
+  }
+
+  .compare-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+  }
+
+  /* Main content layout adjustment on mobile */
+  .main-content {
+    height: calc(100vh - 60px);
+    padding: 16px 16px 32px 16px;
+  }
+
+  /* Hide desktop-only actions and shortcuts */
+  .search-shortcut,
+  .top-bar-actions {
+    display: none;
+  }
+
+  .top-bar {
+    margin-bottom: 20px;
+    padding: 0;
+  }
+
+  .search-wrapper {
+    max-width: 100%;
+  }
+
+  /* Mobile slide-over drawer sidebar */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    margin: 0;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid var(--border-color);
+    background: rgba(10, 10, 12, 0.96);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .logo-section {
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: var(--text-muted);
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .sidebar-close-btn:hover {
+    color: var(--text-main);
+  }
+
+  /* Section headers and details styling on mobile */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .date-display {
+    align-self: flex-end;
+    font-size: 12px;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  /* Table responsive handling for clinical trials */
+  .trials-table-container {
+    padding: 0 12px 12px 12px;
+  }
+
+  .trials-table th,
+  .trials-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+
+  /* Hide sponsor and phase columns on small screens to fit layout */
+  .trials-table th:nth-child(4),
+  .trials-table td:nth-child(4),
+  .trials-table th:nth-child(5),
+  .trials-table td:nth-child(5) {
+    display: none;
+  }
+
+  .trial-title {
+    max-width: 150px;
+  }
+
+  /* Settings grid stacking */
+  .settings-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .settings-card {
+    padding: 16px;
+  }
+
+  /* Comparison view on mobile */
+  .comparison-view .section-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .comparison-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .comparison-card {
+    padding: 16px;
+  }
+
+  .add-more-placeholder {
+    padding: 32px 16px;
+  }
+}
+
