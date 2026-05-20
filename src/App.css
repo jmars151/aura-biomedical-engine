@@ -1175,6 +1175,25 @@
   .add-more-placeholder {
     padding: 32px 16px;
   }
+
+  /* Make compare button visible and responsive on touch/mobile screens */
+  .result-item {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .result-item-info {
+    flex: 1 1 100%;
+  }
+
+  .result-item-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .add-compare-btn {
+    opacity: 1 !important;
+  }
 }
 
 /* Google Sign-in & Authentication Styles */
