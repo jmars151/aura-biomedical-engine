@@ -65,6 +65,25 @@ function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [showProfile, setShowProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
+
+  const pendingAnalyses = [
+    { id: 'PA-001', title: 'Affinity Simulation: Imatinib derivative vs BCR-ABL', category: 'Drug Validation', status: 'simulating' },
+    { id: 'PA-002', title: 'Pathogenicity Re-classification for BRCA1 Variant #821', category: 'Genomics', status: 'queued' },
+    { id: 'PA-003', title: 'Ki Inhibition Constant estimation for ChEMBL25', category: 'Drug-Target Assay', status: 'running' },
+    { id: 'PA-004', title: 'Target Engagement Model for AURA-928', category: 'Compound Profile', status: 'simulating' },
+    { id: 'PA-005', title: 'Phase II Protocol Alignment check for NCT00868335', category: 'Clinical Compliance', status: 'queued' },
+    { id: 'PA-006', title: 'Somatic mutation impact scoring on EGFR', category: 'Genomics', status: 'running' },
+    { id: 'PA-007', title: 'Auto-curation of PubMed abstract ID 3829102', category: 'Literature Bridge', status: 'queued' },
+    { id: 'PA-008', title: 'Structure-Activity Relationship mapping for Imatinib', category: 'Molecular Chemistry', status: 'simulating' },
+    { id: 'PA-009', title: 'Evolutionary Conservation check for BRCA1 promoter region', category: 'TF Binding Study', status: 'queued' },
+    { id: 'PA-010', title: 'Pharmacokinetics model verification for Molecule AURA-928', category: 'ADME Prediction', status: 'running' },
+    { id: 'PA-011', title: 'Safety profile evaluation against openFDA data', category: 'Toxicology Review', status: 'simulating' },
+    { id: 'PA-012', title: 'Multiple Sequence Alignment for BRCA1 homologous proteins', category: 'Phylogeny', status: 'queued' },
+    { id: 'PA-013', title: 'IC50 comparison chart generation', category: 'Visual Report', status: 'running' },
+    { id: 'PA-014', title: 'ChEMBL bioactivity dataset synchronization', category: 'Data Sync', status: 'queued' },
+    { id: 'PA-015', title: 'User interface telemetry and server logs audit', category: 'Telemetry', status: 'running' }
+  ];
 
   // Insights live feed state
   const [recentInsights, setRecentInsights] = useState([]);
@@ -77,15 +96,18 @@ function App() {
         setInsightsLoading(true);
         const trials = await fetchRecentTrials();
         if (trials && trials.length > 0) {
-          const mapped = trials.slice(0, 3).map((trial, idx) => {
-            const relativeTimes = ["2h ago", "5h ago", "1d ago"];
+          const mapped = trials.slice(0, 10).map((trial, idx) => {
+            const relativeTimes = ["2h ago", "5h ago", "1d ago", "2d ago", "3d ago", "4d ago", "5d ago", "1w ago", "1w ago", "2w ago"];
             const phaseLabel = (trial.phase && trial.phase !== 'N/A' && trial.phase !== 'NA') 
               ? `${trial.phase} Trial` 
               : 'New Study';
             return {
               id: trial.id,
+              name: trial.title,
+              type: 'Clinical Trial',
               title: `${phaseLabel}: ${trial.status}`,
               desc: `${trial.sponsor} listed trial ${trial.id} - ${trial.title}.`,
+              details: `Sponsor: ${trial.sponsor}. Status: ${trial.status}. Phase: ${trial.phase}.`,
               time: relativeTimes[idx] || `${idx + 1}d ago`
             };
           });
@@ -630,9 +652,22 @@ function App() {
           </header>
 
           <div className="stats-row">
-            <StatCard label="Active Trials" value={dailyStats.trials} change={dailyStats.trialsChange} />
-            <StatCard label="Molecules Indexed" value={dailyStats.molecules} />
-            <StatCard label="Pending Analysis" value={dailyStats.pending} alert />
+            <StatCard 
+              label="Active Trials" 
+              value={dailyStats.trials} 
+              change={dailyStats.trialsChange} 
+              onClick={() => setActiveView('trials')}
+            />
+            <StatCard 
+              label="Molecules Indexed" 
+              value={dailyStats.molecules} 
+            />
+            <StatCard 
+              label="Pending Analysis" 
+              value={dailyStats.pending} 
+              alert 
+              onClick={() => setShowPendingModal(true)}
+            />
           </div>
 
           <div className="grid-layout">
@@ -717,15 +752,16 @@ function App() {
                   </div>
                 ) : (
                   (recentInsights.length > 0 ? recentInsights : [
-                    { title: "Phase III Completion", desc: "Imatinib derivative shows 15% better affinity.", time: "2h ago" },
-                    { title: "Genomic Update", desc: "BRCA1 variant classification updated to Pathogenic.", time: "5h ago" },
-                    { title: "New Molecule", desc: "AURA-928 added to screening library.", time: "1d ago" }
+                    { id: 'CHEMBL941', name: 'Imatinib derivative', type: 'Drug', title: 'Phase III Completion', desc: 'Imatinib derivative shows 15% better affinity.', details: 'Imatinib derivative shows 15% better affinity against BCR-ABL target in recent simulations.', time: '2h ago' },
+                    { id: 'P38398', name: 'BRCA1 variant', type: 'Protein', title: 'Genomic Update', desc: 'BRCA1 variant classification updated to Pathogenic.', details: 'Clinical validation database updated. BRCA1 variant classified as Pathogenic due to functional disruption.', time: '5h ago' },
+                    { id: 'AURA-928', name: 'AURA-928', type: 'Compound', title: 'New Molecule', desc: 'AURA-928 added to screening library.', details: 'AURA-928 added to screening library for target engagement trials against protein kinases.', time: '1d ago' }
                   ]).map((item, index) => (
                     <InsightItem 
                       key={item.id || index}
                       title={item.title} 
                       desc={item.desc}
                       time={item.time}
+                      onClick={() => setSelectedItem(item)}
                     />
                   ))
                 )}
@@ -737,6 +773,34 @@ function App() {
         )}
         </section>
       </main>
+
+      {showPendingModal && (
+        <div className="modal-backdrop" onClick={() => setShowPendingModal(false)}>
+          <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Pending Analysis Pipeline</h2>
+              <button className="modal-close-btn" onClick={() => setShowPendingModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="pending-list">
+                {pendingAnalyses.map((analysis) => (
+                  <div key={analysis.id} className="pending-item">
+                    <div className="pending-info">
+                      <span className="pending-category">{analysis.category}</span>
+                      <span className="pending-title">{analysis.title}</span>
+                    </div>
+                    <span className={`pending-status-pill ${analysis.status}`}>
+                      {analysis.status === 'simulating' ? 'Simulating...' : analysis.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -750,9 +814,12 @@ function NavItem({ icon, label, active = false, onClick }) {
   );
 }
 
-function StatCard({ label, value, change, alert = false }) {
+function StatCard({ label, value, change, alert = false, onClick }) {
   return (
-    <div className="glass-card stat-card">
+    <div 
+      className={`glass-card stat-card ${onClick ? 'clickable' : ''}`}
+      onClick={onClick}
+    >
       <p className="stat-label">{label}</p>
       <div className="stat-value-container">
         <span className="stat-value">{value}</span>
@@ -763,9 +830,9 @@ function StatCard({ label, value, change, alert = false }) {
   );
 }
 
-function InsightItem({ title, desc, time }) {
+function InsightItem({ title, desc, time, onClick }) {
   return (
-    <div className="insight-item">
+    <div className="insight-item" onClick={onClick} style={onClick ? { cursor: 'pointer' } : {}}>
       <div className="insight-content">
         <h4>{title}</h4>
         <p>{desc}</p>
