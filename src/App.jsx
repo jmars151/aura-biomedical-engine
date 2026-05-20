@@ -8,6 +8,15 @@ import './DetailView.css';
 import './InteractionMap.css';
 import './BindingVisualizer.css';
 
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px' }}>
+    <path d="M17.64 9.20455C17.64 8.56636 17.5827 7.95273 17.4764 7.36364H9V10.845H13.8436C13.635 11.97 13.0009 12.9232 12.0477 13.5614V15.8195H14.9564C16.6582 14.2527 17.64 11.9455 17.64 9.20455Z" fill="#4285F4"/>
+    <path d="M9 18C11.43 18 13.4673 17.1941 14.9577 15.8195L12.0491 13.5614C11.2418 14.1027 10.2109 14.4273 9 14.4273C6.65591 14.4273 4.67182 12.8455 3.96409 10.7182H0.957275V13.0491C2.43818 15.9832 5.48182 18 9 18Z" fill="#34A853"/>
+    <path d="M3.96409 10.7182C3.78409 10.1823 3.68182 9.60545 3.68182 9C3.68182 8.39455 3.78409 7.81773 3.96409 7.28182V4.95091H0.957275C0.347727 6.16773 0 7.54773 0 9C0 10.4523 0.347727 11.8323 0.957275 13.0491L3.96409 10.7182Z" fill="#FBBC05"/>
+    <path d="M9 3.57273C10.3214 3.57273 11.5077 4.02545 12.4405 4.91727L15.0218 2.33591C13.4632 0.887727 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.95091L3.96409 7.28182C4.67182 5.15455 6.65591 3.57273 9 3.57273Z" fill="#EA4335"/>
+  </svg>
+);
+
 function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState(null);
@@ -18,6 +27,105 @@ function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [showProfile, setShowProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Authentication & Session state
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('aura_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // User-specific settings & database
+  const [libraryItems, setLibraryItems] = useState([]);
+  const [glassmorphismIntensity, setGlassmorphismIntensity] = useState(80);
+  const [darkMode, setDarkMode] = useState(true);
+
+  // Sync state on user change
+  useEffect(() => {
+    if (!currentUser) return;
+    const userKey = `aura_user_data_${currentUser.email}`;
+    const savedData = localStorage.getItem(userKey);
+    if (savedData) {
+      const parsed = JSON.parse(savedData);
+      setLibraryItems(parsed.libraryItems || []);
+      setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
+      setDarkMode(parsed.darkMode ?? true);
+    } else {
+      const defaultLibrary = [
+        { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
+        { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
+        { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
+      ];
+      setLibraryItems(defaultLibrary);
+      setGlassmorphismIntensity(80);
+      setDarkMode(true);
+      
+      localStorage.setItem(userKey, JSON.stringify({
+        libraryItems: defaultLibrary,
+        glassmorphismIntensity: 80,
+        darkMode: true
+      }));
+    }
+  }, [currentUser]);
+
+  // Sync state back to localStorage
+  useEffect(() => {
+    if (!currentUser) return;
+    const userKey = `aura_user_data_${currentUser.email}`;
+    const currentData = {
+      libraryItems,
+      glassmorphismIntensity,
+      darkMode
+    };
+    localStorage.setItem(userKey, JSON.stringify(currentData));
+  }, [libraryItems, glassmorphismIntensity, darkMode, currentUser]);
+
+  // Apply glassmorphism intensity CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--glass-blur', `${glassmorphismIntensity / 5}px`);
+  }, [glassmorphismIntensity]);
+
+  // Apply dark mode theme
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add('dark-theme');
+      document.body.style.background = 'radial-gradient(circle at 50% -20%, #1e1b4b 0%, #0a0a0c 100%)';
+    } else {
+      document.body.classList.remove('dark-theme');
+      document.body.style.background = 'radial-gradient(circle at 50% -20%, #e0e7ff 0%, #f8fafc 100%)';
+    }
+  }, [darkMode]);
+
+  const handleMockLogin = (userData) => {
+    setIsLoggingIn(true);
+    setTimeout(() => {
+      setCurrentUser(userData);
+      localStorage.setItem('aura_current_user', JSON.stringify(userData));
+      setIsLoggingIn(false);
+    }, 1200);
+  };
+
+  const handleCustomLogin = (e) => {
+    e.preventDefault();
+    const emailInput = e.target.querySelector('.custom-login-input');
+    if (!emailInput) return;
+    const email = emailInput.value;
+    const name = email.split('@')[0];
+    const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
+    const userData = {
+      email,
+      name: formattedName,
+      role: 'Standard Access',
+      avatarSeed: name
+    };
+    handleMockLogin(userData);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('aura_current_user');
+    setShowProfile(false);
+  };
 
   const addToComparison = (item) => {
     if (comparisonList.length >= 4) return;
@@ -46,6 +154,101 @@ function App() {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
+
+  if (!currentUser) {
+    return (
+      <div className="login-container">
+        <div className="login-card glass-card animate-fade-in">
+          <div className="login-header">
+            <div className="logo-wrapper" style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <FlaskConical className="logo-icon" size={32} />
+              <span className="logo-text">AURA</span>
+            </div>
+            <h2>Biomedical Intelligence Engine</h2>
+            <p className="subtitle">Secure Google Account Authentication</p>
+          </div>
+
+          {isLoggingIn ? (
+            <div className="login-loading">
+              <Loader2 className="animate-spin accent-spinner" size={40} />
+              <p>Authenticating credentials...</p>
+            </div>
+          ) : (
+            <div className="login-content">
+              <p className="login-instruction">Select a simulated Google Account to sign in:</p>
+              
+              <div className="preset-users">
+                <button 
+                  className="preset-user-btn glass-card"
+                  onClick={() => handleMockLogin({
+                    email: 'dr.researcher@aura.org',
+                    name: 'Dr. Researcher',
+                    role: 'Admin Access',
+                    avatarSeed: 'researcher'
+                  })}
+                >
+                  <div className="user-avatar-mini researcher">DR</div>
+                  <div className="preset-user-info">
+                    <p className="preset-user-name">Dr. Researcher</p>
+                    <p className="preset-user-email">dr.researcher@aura.org (Admin)</p>
+                  </div>
+                </button>
+
+                <button 
+                  className="preset-user-btn glass-card"
+                  onClick={() => handleMockLogin({
+                    email: 'alex.carter@biotech.io',
+                    name: 'Dr. Alex Carter',
+                    role: 'Senior Scientist',
+                    avatarSeed: 'carter'
+                  })}
+                >
+                  <div className="user-avatar-mini scientist">AC</div>
+                  <div className="preset-user-info">
+                    <p className="preset-user-name">Dr. Alex Carter</p>
+                    <p className="preset-user-email">alex.carter@biotech.io</p>
+                  </div>
+                </button>
+
+                <button 
+                  className="preset-user-btn glass-card"
+                  onClick={() => handleMockLogin({
+                    email: 'guest.user@gmail.com',
+                    name: 'Guest Researcher',
+                    role: 'Standard Access',
+                    avatarSeed: 'guest'
+                  })}
+                >
+                  <div className="user-avatar-mini guest">GR</div>
+                  <div className="preset-user-info">
+                    <p className="preset-user-name">Guest Researcher</p>
+                    <p className="preset-user-email">guest.user@gmail.com</p>
+                  </div>
+                </button>
+              </div>
+
+              <div className="divider-or">
+                <span>or enter a custom email</span>
+              </div>
+
+              <form onSubmit={handleCustomLogin} className="custom-login-form">
+                <input 
+                  type="email" 
+                  placeholder="name@gmail.com" 
+                  required
+                  className="custom-login-input glass-card"
+                />
+                <button type="submit" className="google-sign-in-btn">
+                  <GoogleIcon />
+                  <span>Sign in with Google</span>
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -98,23 +301,40 @@ function App() {
           {showProfile && (
             <div className="profile-popover glass-card animate-fade-in">
               <div className="popover-header">
-                <h3>Admin Settings</h3>
+                <h3>{currentUser.role}</h3>
               </div>
               <div className="popover-content">
-                <div className="popover-item"><Settings size={14} /> Account Settings</div>
-                <div className="popover-item"><FlaskConical size={14} /> My Experiments</div>
+                <div 
+                  className="popover-item"
+                  onClick={() => { setActiveView('settings'); setShowProfile(false); }}
+                >
+                  <Settings size={14} /> Account Settings
+                </div>
+                <div 
+                  className="popover-item"
+                  onClick={() => { setActiveView('library'); setShowProfile(false); }}
+                >
+                  <FlaskConical size={14} /> My Experiments
+                </div>
                 <div className="divider"></div>
-                <div className="popover-item logout">Log Out</div>
+                <div 
+                  className="popover-item logout"
+                  onClick={handleLogout}
+                >
+                  Log Out
+                </div>
               </div>
             </div>
           )}
           <div className="profile-section" onClick={() => setShowProfile(!showProfile)}>
             <div className="profile-badge">
-              <User size={18} />
+              <span className="profile-initials">
+                {currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+              </span>
             </div>
             <div className="profile-info">
-              <p className="profile-name">Dr. Researcher</p>
-              <p className="profile-role">Admin Access</p>
+              <p className="profile-name">{currentUser.name}</p>
+              <p className="profile-role">{currentUser.role}</p>
             </div>
           </div>
         </div>
@@ -146,18 +366,35 @@ function App() {
               </button>
             )}
             <div className="mobile-profile-trigger" onClick={() => setShowProfile(!showProfile)}>
-              <User size={18} />
+              <span className="profile-initials" style={{ fontSize: '12px' }}>
+                {currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+              </span>
             </div>
             {showProfile && (
               <div className="profile-popover glass-card mobile-popover animate-fade-in">
                 <div className="popover-header">
-                  <h3>Admin Settings</h3>
+                  <h3>{currentUser.role}</h3>
                 </div>
                 <div className="popover-content">
-                  <div className="popover-item"><Settings size={14} /> Account Settings</div>
-                  <div className="popover-item"><FlaskConical size={14} /> My Experiments</div>
+                  <div 
+                    className="popover-item"
+                    onClick={() => { setActiveView('settings'); setShowProfile(false); }}
+                  >
+                    <Settings size={14} /> Account Settings
+                  </div>
+                  <div 
+                    className="popover-item"
+                    onClick={() => { setActiveView('library'); setShowProfile(false); }}
+                  >
+                    <FlaskConical size={14} /> My Experiments
+                  </div>
                   <div className="divider"></div>
-                  <div className="popover-item logout">Log Out</div>
+                  <div 
+                    className="popover-item logout"
+                    onClick={handleLogout}
+                  >
+                    Log Out
+                  </div>
                 </div>
               </div>
             )}
@@ -240,9 +477,21 @@ function App() {
         </header>
 
         <section className="dashboard-grid animate-fade-in">
-          {activeView === 'library' && <LibraryView />}
+          {activeView === 'library' && (
+            <LibraryView 
+              libraryItems={libraryItems} 
+              setLibraryItems={setLibraryItems} 
+            />
+          )}
           {activeView === 'trials' && <TrialsView />}
-          {activeView === 'settings' && <SettingsView />}
+          {activeView === 'settings' && (
+            <SettingsView 
+              glassmorphismIntensity={glassmorphismIntensity} 
+              setGlassmorphismIntensity={setGlassmorphismIntensity}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+            />
+          )}
           
           {activeView === 'dashboard' && (
             showComparison ? (
@@ -444,12 +693,29 @@ function InsightItem({ title, desc, time }) {
 }
 
 export default App;
-function LibraryView() {
-  const suggestions = [
-    { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
-    { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
-    { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
-  ];
+function LibraryView({ libraryItems, setLibraryItems }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newId, setNewId] = useState('');
+  const [newType, setNewType] = useState('Drug');
+  const [newStatus, setNewStatus] = useState('Active');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!newName || !newId) return;
+    const newItem = {
+      name: newName,
+      id: newId,
+      type: newType,
+      status: newStatus
+    };
+    setLibraryItems([...libraryItems, newItem]);
+    setNewName('');
+    setNewId('');
+    setNewType('Drug');
+    setNewStatus('Active');
+    setIsAdding(false);
+  };
 
   return (
     <div className="secondary-view animate-fade-in">
@@ -460,21 +726,90 @@ function LibraryView() {
         </div>
       </header>
       <div className="library-grid">
-        {suggestions.map((item) => (
+        {libraryItems.map((item) => (
           <div key={item.id} className="glass-card library-card">
+            <button 
+              className="remove-btn"
+              onClick={() => setLibraryItems(libraryItems.filter(i => i.id !== item.id))}
+              style={{ pointerEvents: 'auto' }}
+            >
+              ×
+            </button>
             <span className="badge">{item.type}</span>
             <h3>{item.name}</h3>
             <p className="id-tag">{item.id}</p>
             <div className="card-footer">
-              <span className="status-online">{item.status}</span>
+              <span className={item.status === 'Approved' || item.status === 'Active' ? 'status-online' : 'status-offline'} style={{ color: item.status === 'Approved' || item.status === 'Active' ? '#10b981' : '#f59e0b' }}>
+                {item.status}
+              </span>
               <ChevronRight size={14} />
             </div>
           </div>
         ))}
-        <div className="glass-card add-more-card">
-          <div className="plus-icon">+</div>
-          <p>Add Target</p>
-        </div>
+
+        {isAdding ? (
+          <form onSubmit={handleSubmit} className="glass-card library-card add-target-form">
+            <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>New Target</h3>
+            <input 
+              type="text" 
+              placeholder="Name (e.g. Imatinib)" 
+              value={newName} 
+              onChange={e => setNewName(e.target.value)} 
+              required
+              className="custom-login-input"
+              style={{ width: '100%', padding: '6px 10px', fontSize: '12px', marginBottom: '6px', height: '32px' }}
+            />
+            <input 
+              type="text" 
+              placeholder="ID (e.g. CHEMBL941)" 
+              value={newId} 
+              onChange={e => setNewId(e.target.value)} 
+              required
+              className="custom-login-input"
+              style={{ width: '100%', padding: '6px 10px', fontSize: '12px', marginBottom: '6px', height: '32px' }}
+            />
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+              <select 
+                value={newType} 
+                onChange={e => setNewType(e.target.value)}
+                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+              >
+                <option value="Drug" style={{ background: '#0a0a0c' }}>Drug</option>
+                <option value="Protein" style={{ background: '#0a0a0c' }}>Protein</option>
+                <option value="Compound" style={{ background: '#0a0a0c' }}>Compound</option>
+              </select>
+              <select 
+                value={newStatus} 
+                onChange={e => setNewStatus(e.target.value)}
+                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+              >
+                <option value="Active" style={{ background: '#0a0a0c' }}>Active</option>
+                <option value="Approved" style={{ background: '#0a0a0c' }}>Approved</option>
+                <option value="Pending" style={{ background: '#0a0a0c' }}>Pending</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button 
+                type="submit" 
+                style={{ flex: 1, padding: '6px', background: 'var(--accent-primary)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}
+              >
+                Add
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setIsAdding(false)}
+                style={{ flex: 1, padding: '6px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="glass-card add-more-card" onClick={() => setIsAdding(true)}>
+            <div className="plus-icon">+</div>
+            <p>Add Target</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -541,7 +876,7 @@ function TrialsView() {
   );
 }
 
-function SettingsView() {
+function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkMode, setDarkMode }) {
   return (
     <div className="secondary-view animate-fade-in">
       <header className="section-header">
@@ -554,12 +889,26 @@ function SettingsView() {
         <div className="glass-card settings-card">
           <h3>Display Preferences</h3>
           <div className="setting-row">
-            <span>Dark Mode (Always On)</span>
-            <div className="toggle active"></div>
+            <span>Dark Mode</span>
+            <div 
+              className={`toggle ${darkMode ? 'active' : ''}`}
+              onClick={() => setDarkMode(!darkMode)}
+              style={{ cursor: 'pointer' }}
+            ></div>
           </div>
-          <div className="setting-row">
+          <div className="setting-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <span>Glassmorphism Intensity</span>
-            <input type="range" readOnly value="80" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={glassmorphismIntensity} 
+                onChange={(e) => setGlassmorphismIntensity(Number(e.target.value))}
+                style={{ flex: 1, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', width: '32px', textAlign: 'right' }}>{glassmorphismIntensity}%</span>
+            </div>
           </div>
         </div>
         <div className="glass-card settings-card">
