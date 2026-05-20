@@ -1715,4 +1715,19 @@
   border-radius: 6px;
 }
 
+/* Interactive Logo hover transitions */
+.logo-wrapper,
+.mobile-logo {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.logo-wrapper:hover,
+.mobile-logo:hover {
+  opacity: 0.9;
+  transform: translateY(-0.5px);
+}
+.logo-wrapper:active,
+.mobile-logo:active {
+  transform: translateY(0.5px);
+}
+
 

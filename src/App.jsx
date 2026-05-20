@@ -223,6 +223,15 @@ function App() {
     setShowProfile(false);
   };
 
+  const handleLogoClick = () => {
+    setActiveView('dashboard');
+    setSelectedItem(null);
+    setShowComparison(false);
+    setResults(null);
+    setSearchQuery('');
+    setSidebarOpen(false);
+  };
+
   const addToComparison = (item) => {
     if (comparisonList.length >= 4) return;
     if (!comparisonList.find(i => i.id === item.id)) {
@@ -357,7 +366,7 @@ function App() {
       {/* Sidebar Navigation */}
       <aside className={`sidebar glass-card ${sidebarOpen ? 'mobile-open' : ''}`}>
         <div className="logo-section">
-          <div className="logo-wrapper">
+          <div className="logo-wrapper" onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
             <FlaskConical className="logo-icon" />
             <span className="logo-text">AURA</span>
           </div>
@@ -443,7 +452,7 @@ function App() {
           <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>
             <Menu size={24} />
           </button>
-          <div className="mobile-logo">
+          <div className="mobile-logo" onClick={handleLogoClick} style={{ cursor: 'pointer' }}>
             <FlaskConical className="logo-icon" size={20} />
             <span className="logo-text">AURA</span>
           </div>
