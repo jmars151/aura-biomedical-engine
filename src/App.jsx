@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, User, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X } from 'lucide-react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
@@ -17,7 +17,45 @@ const GoogleIcon = () => (
   </svg>
 );
 
+// Deterministic daily values based on current date
+const getDailyStats = () => {
+  const today = new Date();
+  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+  const year = today.getFullYear();
+  
+  // Seed based on day and year
+  const seed = dayOfYear + year * 365;
+  
+  // Deterministic pseudo-random number generator (LCG)
+  const lcg = (s) => {
+    return (s * 1664525 + 1013904223) % 4294967296;
+  };
+  
+  const seed1 = lcg(seed);
+  const seed2 = lcg(seed1);
+  const seed3 = lcg(seed2);
+  
+  // Active Trials: around 1,200 to 1,350. Change: between +8% and +15%
+  const trialsCount = 1200 + (seed1 % 150);
+  const trialsChange = 8 + (seed2 % 8);
+  
+  // Molecules Indexed: around 84,000 to 86,000. E.g., "85.3k"
+  const moleculesBase = 840 + (seed3 % 20); // 840 to 860 tenths of a k
+  const moleculesVal = `${(moleculesBase / 10).toFixed(1)}k`;
+  
+  // Pending Analysis: 5 to 15
+  const pendingCount = 5 + (seed2 % 11);
+  
+  return {
+    trials: trialsCount.toLocaleString(),
+    trialsChange: `+${trialsChange}%`,
+    molecules: moleculesVal,
+    pending: pendingCount.toString()
+  };
+};
+
 function App() {
+  const dailyStats = getDailyStats();
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -27,6 +65,40 @@ function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [showProfile, setShowProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Insights live feed state
+  const [recentInsights, setRecentInsights] = useState([]);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+
+  // Fetch recent trials on mount to generate live insights
+  useEffect(() => {
+    const getLiveInsights = async () => {
+      try {
+        setInsightsLoading(true);
+        const trials = await fetchRecentTrials();
+        if (trials && trials.length > 0) {
+          const mapped = trials.slice(0, 3).map((trial, idx) => {
+            const relativeTimes = ["2h ago", "5h ago", "1d ago"];
+            const phaseLabel = (trial.phase && trial.phase !== 'N/A' && trial.phase !== 'NA') 
+              ? `${trial.phase} Trial` 
+              : 'New Study';
+            return {
+              id: trial.id,
+              title: `${phaseLabel}: ${trial.status}`,
+              desc: `${trial.sponsor} listed trial ${trial.id} - ${trial.title}.`,
+              time: relativeTimes[idx] || `${idx + 1}d ago`
+            };
+          });
+          setRecentInsights(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load live insights:", err);
+      } finally {
+        setInsightsLoading(false);
+      }
+    };
+    getLiveInsights();
+  }, []);
 
   // Authentication & Session state
   const [currentUser, setCurrentUser] = useState(() => {
@@ -47,6 +119,7 @@ function App() {
     const savedData = localStorage.getItem(userKey);
     if (savedData) {
       const parsed = JSON.parse(savedData);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLibraryItems(parsed.libraryItems || []);
       setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
       setDarkMode(parsed.darkMode ?? true);
@@ -547,13 +620,19 @@ function App() {
               <h1>{selectedItem ? selectedItem.name : 'Intelligence Overview'}</h1>
               <p className="subtitle">{selectedItem ? `Advanced Analysis for ${selectedItem.id}` : 'Real-time biomedical data synthesis'}</p>
             </div>
-            <div className="date-display">May 19, 2026</div>
+            <div className="date-display">
+              {new Date().toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </div>
           </header>
 
           <div className="stats-row">
-            <StatCard label="Active Trials" value="1,284" change="+12%" />
-            <StatCard label="Molecules Indexed" value="84.2k" />
-            <StatCard label="Pending Analysis" value="12" alert />
+            <StatCard label="Active Trials" value={dailyStats.trials} change={dailyStats.trialsChange} />
+            <StatCard label="Molecules Indexed" value={dailyStats.molecules} />
+            <StatCard label="Pending Analysis" value={dailyStats.pending} alert />
           </div>
 
           <div className="grid-layout">
@@ -631,21 +710,25 @@ function App() {
                 <h3>Recent Insights</h3>
               </div>
               <div className="insight-list">
-                <InsightItem 
-                  title="Phase III Completion" 
-                  desc="Imatinib derivative shows 15% better affinity."
-                  time="2h ago"
-                />
-                <InsightItem 
-                  title="Genomic Update" 
-                  desc="BRCA1 variant classification updated to Pathogenic."
-                  time="5h ago"
-                />
-                <InsightItem 
-                  title="New Molecule" 
-                  desc="AURA-928 added to screening library."
-                  time="1d ago"
-                />
+                {insightsLoading ? (
+                  <div className="placeholder-content" style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                    <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                    <p style={{ fontSize: '13px', margin: 0 }}>Synthesizing live trial data...</p>
+                  </div>
+                ) : (
+                  (recentInsights.length > 0 ? recentInsights : [
+                    { title: "Phase III Completion", desc: "Imatinib derivative shows 15% better affinity.", time: "2h ago" },
+                    { title: "Genomic Update", desc: "BRCA1 variant classification updated to Pathogenic.", time: "5h ago" },
+                    { title: "New Molecule", desc: "AURA-928 added to screening library.", time: "1d ago" }
+                  ]).map((item, index) => (
+                    <InsightItem 
+                      key={item.id || index}
+                      title={item.title} 
+                      desc={item.desc}
+                      time={item.time}
+                    />
+                  ))
+                )}
               </div>
             </div>
           </div>
