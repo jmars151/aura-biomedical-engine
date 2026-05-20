@@ -66,6 +66,7 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showGlobalMapModal, setShowGlobalMapModal] = useState(false);
 
   const pendingAnalyses = [
     { id: 'PA-001', title: 'Affinity Simulation: Imatinib derivative vs BCR-ABL', category: 'Drug Validation', status: 'simulating' },
@@ -729,7 +730,10 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <div className="card-header">
+                  <div 
+                    className="card-header clickable-header" 
+                    onClick={() => setShowGlobalMapModal(true)}
+                  >
                     <h3>Global Trial Distribution</h3>
                     <ChevronRight size={16} />
                   </div>
@@ -796,6 +800,126 @@ function App() {
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGlobalMapModal && (
+        <div className="modal-backdrop" onClick={() => setShowGlobalMapModal(false)}>
+          <div className="glass-card modal-card" style={{ maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Global Trial Distribution Explorer</h2>
+                <p className="subtitle" style={{ fontSize: '12px', margin: '4px 0 0 0' }}>Geographic density and clinical phase breakdown</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowGlobalMapModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="distribution-layout">
+                <div className="distribution-panel">
+                  <h3>Regional Trial Density</h3>
+                  <div className="geo-stat-bar-group">
+                    <div className="geo-bar-row">
+                      <div className="geo-bar-info">
+                        <span className="geo-bar-label">North America</span>
+                        <span className="geo-bar-value">42% (511 trials)</span>
+                      </div>
+                      <div className="geo-bar-track">
+                        <div className="geo-bar-fill" style={{ width: '42%' }}></div>
+                      </div>
+                    </div>
+                    
+                    <div className="geo-bar-row">
+                      <div className="geo-bar-info">
+                        <span className="geo-bar-label">Europe</span>
+                        <span className="geo-bar-value">31% (377 trials)</span>
+                      </div>
+                      <div className="geo-bar-track">
+                        <div className="geo-bar-fill" style={{ width: '31%' }}></div>
+                      </div>
+                    </div>
+                    
+                    <div className="geo-bar-row">
+                      <div className="geo-bar-info">
+                        <span className="geo-bar-label">East Asia</span>
+                        <span className="geo-bar-value">18% (219 trials)</span>
+                      </div>
+                      <div className="geo-bar-track">
+                        <div className="geo-bar-fill" style={{ width: '18%' }}></div>
+                      </div>
+                    </div>
+                    
+                    <div className="geo-bar-row">
+                      <div className="geo-bar-info">
+                        <span className="geo-bar-label">South America</span>
+                        <span className="geo-bar-value">5% (61 trials)</span>
+                      </div>
+                      <div className="geo-bar-track">
+                        <div className="geo-bar-fill" style={{ width: '5%' }}></div>
+                      </div>
+                    </div>
+
+                    <div className="geo-bar-row">
+                      <div className="geo-bar-info">
+                        <span className="geo-bar-label">Rest of World</span>
+                        <span className="geo-bar-value">4% (49 trials)</span>
+                      </div>
+                      <div className="geo-bar-track">
+                        <div className="geo-bar-fill" style={{ width: '4%' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="distribution-panel">
+                  <h3>Clinical Phase Distribution</h3>
+                  <div className="phase-pill-grid">
+                    <div className="phase-pill-card">
+                      <span className="phase-pill-value">184</span>
+                      <span className="phase-pill-label">Phase I</span>
+                    </div>
+                    <div className="phase-pill-card">
+                      <span className="phase-pill-value">425</span>
+                      <span className="phase-pill-label">Phase II</span>
+                    </div>
+                    <div className="phase-pill-card">
+                      <span className="phase-pill-value">486</span>
+                      <span className="phase-pill-label">Phase III</span>
+                    </div>
+                    <div className="phase-pill-card">
+                      <span className="phase-pill-value">122</span>
+                      <span className="phase-pill-label">Phase IV</span>
+                    </div>
+                  </div>
+
+                  <h3 style={{ marginTop: '16px' }}>Top Contributing Countries</h3>
+                  <div className="country-list">
+                    <div className="country-row">
+                      <span className="country-name">United States</span>
+                      <span className="country-count">482 trials</span>
+                    </div>
+                    <div className="country-row">
+                      <span className="country-name">United Kingdom</span>
+                      <span className="country-count">120 trials</span>
+                    </div>
+                    <div className="country-row">
+                      <span className="country-name">Germany</span>
+                      <span className="country-count">94 trials</span>
+                    </div>
+                    <div className="country-row">
+                      <span className="country-name">Japan</span>
+                      <span className="country-count">85 trials</span>
+                    </div>
+                    <div className="country-row">
+                      <span className="country-name">France</span>
+                      <span className="country-count">72 trials</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

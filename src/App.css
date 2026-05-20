@@ -1546,4 +1546,154 @@
   to { opacity: 1; }
 }
 
+/* Clickable card headers */
+.card-header.clickable-header {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.card-header.clickable-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.card-header.clickable-header:hover h3 {
+  color: var(--accent-primary);
+}
+.card-header.clickable-header:hover svg {
+  transform: translateX(4px);
+  color: var(--accent-primary);
+}
+
+/* Global Distribution Modal Specifics */
+.distribution-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .distribution-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.distribution-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.distribution-panel h3 {
+  font-size: 16px;
+  font-family: 'Outfit', sans-serif;
+  margin-bottom: 12px;
+  color: var(--accent-primary);
+}
+
+.geo-stat-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.geo-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.geo-bar-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.geo-bar-label {
+  font-weight: 500;
+}
+
+.geo-bar-value {
+  color: var(--text-muted);
+}
+
+.geo-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.geo-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.phase-pill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.phase-pill-card {
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.phase-pill-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  font-family: 'Outfit', sans-serif;
+}
+
+.phase-pill-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.country-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.country-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.country-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.country-count {
+  font-size: 12px;
+  color: var(--accent-primary);
+  font-family: monospace;
+  font-weight: 700;
+  background: rgba(139, 92, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
 
