@@ -92,24 +92,16 @@ function App() {
 
   // Fetch recent trials on mount to generate live insights
   useEffect(() => {
-    const getRelativeTimeString = (dateStr) => {
-      if (!dateStr) return 'Recent';
+    const formatTrialDate = (dateStr) => {
+      if (!dateStr) return 'N/A';
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return 'Recent';
+      if (isNaN(date.getTime())) return 'N/A';
       
-      const now = new Date();
-      const diffMs = now - date;
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      
-      if (diffDays <= 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 30) return `${diffDays}d ago`;
-      
-      const diffMonths = Math.floor(diffDays / 30);
-      if (diffMonths < 12) return `${diffMonths}mo ago`;
-      
-      const diffYears = Math.floor(diffMonths / 12);
-      return `${diffYears}y ago`;
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
     };
 
     const getLiveInsights = async () => {
@@ -128,7 +120,7 @@ function App() {
               title: `${phaseLabel}: ${trial.status}`,
               desc: `${trial.sponsor} listed trial ${trial.id} - ${trial.title}.`,
               details: `Sponsor: ${trial.sponsor}. Status: ${trial.status}. Phase: ${trial.phase}.`,
-              time: getRelativeTimeString(trial.lastUpdate)
+              time: formatTrialDate(trial.lastUpdate)
             };
           });
           setRecentInsights(mapped);

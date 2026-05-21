@@ -75,7 +75,7 @@ export const fetchRecentTrials = async (pageSize = 50) => {
       status: s.protocolSection?.statusModule?.overallStatus || 'Unknown',
       phase: s.protocolSection?.designModule?.phases?.[0] || 'N/A',
       sponsor: s.protocolSection?.sponsorCollaboratorsModule?.leadSponsor?.name || 'Unknown Sponsor',
-      lastUpdate: s.protocolSection?.statusModule?.lastUpdateSubmitDate || s.protocolSection?.statusModule?.studyFirstSubmitDate || null
+      lastUpdate: s.protocolSection?.statusModule?.lastUpdateSubmitDate || null
     }));
   } catch (error) {
     console.error('Failed to fetch trials:', error);
