@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X } from 'lucide-react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
@@ -400,6 +400,12 @@ function App() {
             active={activeView === 'settings'}
             onClick={() => { setActiveView('settings'); setSidebarOpen(false); }}
           />
+          <NavItem 
+            icon={<Mail size={20} />} 
+            label="Support" 
+            active={activeView === 'contact'}
+            onClick={() => { setActiveView('contact'); setSidebarOpen(false); }}
+          />
         </nav>
 
         <div className="profile-wrapper">
@@ -596,6 +602,9 @@ function App() {
               darkMode={darkMode}
               setDarkMode={setDarkMode}
             />
+          )}
+          {activeView === 'contact' && (
+            <ContactView />
           )}
           
           {activeView === 'dashboard' && (
@@ -1198,6 +1207,223 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
           <h3>Data Sources</h3>
           <div className="source-item"><span>ChEMBL API</span> <span className="status-online">Online</span></div>
           <div className="source-item"><span>UniProt REST</span> <span className="status-online">Online</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactView() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [category, setCategory] = useState('general');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState('idle'); // 'idle' | 'sending' | 'success' | 'error'
+  const [statusMessage, setStatusMessage] = useState('');
+  const siteKey = '6Le7rfQsAAAAACumE-xOc-Pz_UGji1uWss4dFfBF';
+
+  useEffect(() => {
+    // Check if script is already present
+    let script = document.getElementById('recaptcha-script');
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'recaptcha-script';
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, [siteKey]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name || !email || !message) {
+      setStatus('error');
+      setStatusMessage('Please fill in all required fields.');
+      return;
+    }
+
+    setStatus('sending');
+
+    try {
+      if (!window.grecaptcha) {
+        throw new Error('reCAPTCHA is loading. Please try again in a moment.');
+      }
+
+      const token = await new Promise((resolve, reject) => {
+        window.grecaptcha.ready(() => {
+          window.grecaptcha.execute(siteKey, { action: 'submit' })
+            .then(resolve)
+            .catch(reject);
+        });
+      });
+
+      const response = await fetch('/contact.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          category,
+          subject: subject || `${category.toUpperCase()}: Contact Form Submission`,
+          message,
+          gRecaptchaResponse: token
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        setStatus('success');
+        setName('');
+        setEmail('');
+        setSubject('');
+        setMessage('');
+      } else {
+        setStatus('error');
+        setStatusMessage(result.message || 'Failed to send your message. Please try again.');
+      }
+    } catch (error) {
+      console.error(error);
+      setStatus('error');
+      setStatusMessage(error.message || 'An unexpected error occurred. Please verify your connection or backend script.');
+    }
+  };
+
+  return (
+    <div className="secondary-view animate-fade-in">
+      <header className="section-header">
+        <div>
+          <h1>Support & Feedback</h1>
+          <p className="subtitle">Submit a bug report, request a feature, or get in touch</p>
+        </div>
+      </header>
+
+      <div className="contact-container">
+        <div className="glass-card contact-card">
+          {status === 'success' && (
+            <div className="contact-alert success animate-fade-in">
+              <h4>Message Sent!</h4>
+              <p>Thank you for reaching out. We will get back to you shortly.</p>
+            </div>
+          )}
+          
+          {status === 'error' && (
+            <div className="contact-alert error animate-fade-in">
+              <h4>Submission Error</h4>
+              <p>{statusMessage}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="contact-form">
+            <div className="form-group">
+              <label>Name <span className="required-star">*</span></label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Enter your name"
+                required
+                disabled={status === 'sending'}
+                className="custom-login-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email Address <span className="required-star">*</span></label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                disabled={status === 'sending'}
+                className="custom-login-input"
+              />
+            </div>
+
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Category</label>
+                <select 
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                  disabled={status === 'sending'}
+                  className="contact-select"
+                >
+                  <option value="general">General Contact</option>
+                  <option value="bug">Report a Bug</option>
+                  <option value="feature">Feature Request</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Subject</label>
+                <input 
+                  type="text" 
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  placeholder="Subject of message (optional)"
+                  disabled={status === 'sending'}
+                  className="custom-login-input"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Message <span className="required-star">*</span></label>
+              <textarea 
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="How can we help you?"
+                required
+                rows={5}
+                disabled={status === 'sending'}
+                className="contact-textarea custom-login-input"
+              />
+            </div>
+
+            <div className="form-group captcha-group">
+              <p className="captcha-help-text" style={{ fontSize: '11px', opacity: 0.6, marginTop: '8px' }}>
+                This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>Terms of Service</a> apply.
+              </p>
+            </div>
+
+            <button 
+              type="submit" 
+              className="primary-button submit-btn"
+              disabled={status === 'sending'}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '200px', height: '42px' }}
+            >
+              {status === 'sending' ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <span>Send Message</span>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className="glass-card contact-info-card">
+          <h3>AURA Support & Feedback</h3>
+          <p>Your feedback is vital to our roadmap. Bug reports and feature suggestions are automatically routed to our priority development queue.</p>
+          
+          <div className="info-meta">
+            <div className="info-item">
+              <span className="info-label">Queue Response Target</span>
+              <span className="info-val">&lt; 24 Hours</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Supported Categories</span>
+              <span className="info-val">Bugs, Feature requests, general contact</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
