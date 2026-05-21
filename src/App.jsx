@@ -1417,10 +1417,10 @@ function ContactView() {
           <div className="info-meta">
             <div className="info-item">
               <span className="info-label">Queue Response Target</span>
-              <span className="info-val">&lt; 24 Hours</span>
+              <span className="info-val"> &lt; 24 Hours</span>
             </div>
             <div className="info-item">
-              <span className="info-label">Supported Categories</span>
+              <span className="info-label">Supported Categories: </span>
               <span className="info-val">Bugs, Feature requests, general contact</span>
             </div>
           </div>
