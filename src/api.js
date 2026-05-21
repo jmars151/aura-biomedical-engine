@@ -66,7 +66,7 @@ async function searchTrials(query) {
 
 export const fetchRecentTrials = async (pageSize = 50) => {
   try {
-    const response = await fetch(`${CLINICAL_TRIALS_BASE}?pageSize=${pageSize}`);
+    const response = await fetch(`${CLINICAL_TRIALS_BASE}?pageSize=${pageSize}&sort=LastUpdatePostDate:desc`);
     const data = await response.json();
     const studies = data.studies || [];
     return studies.map(s => ({
