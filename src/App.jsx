@@ -92,13 +92,32 @@ function App() {
 
   // Fetch recent trials on mount to generate live insights
   useEffect(() => {
+    const getRelativeTimeString = (dateStr) => {
+      if (!dateStr) return 'Recent';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Recent';
+      
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays <= 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 30) return `${diffDays}d ago`;
+      
+      const diffMonths = Math.floor(diffDays / 30);
+      if (diffMonths < 12) return `${diffMonths}mo ago`;
+      
+      const diffYears = Math.floor(diffMonths / 12);
+      return `${diffYears}y ago`;
+    };
+
     const getLiveInsights = async () => {
       try {
         setInsightsLoading(true);
         const trials = await fetchRecentTrials();
         if (trials && trials.length > 0) {
-          const mapped = trials.slice(0, 10).map((trial, idx) => {
-            const relativeTimes = ["2h ago", "5h ago", "1d ago", "2d ago", "3d ago", "4d ago", "5d ago", "1w ago", "1w ago", "2w ago"];
+          const mapped = trials.slice(0, 10).map((trial) => {
             const phaseLabel = (trial.phase && trial.phase !== 'N/A' && trial.phase !== 'NA') 
               ? `${trial.phase} Trial` 
               : 'New Study';
@@ -109,7 +128,7 @@ function App() {
               title: `${phaseLabel}: ${trial.status}`,
               desc: `${trial.sponsor} listed trial ${trial.id} - ${trial.title}.`,
               details: `Sponsor: ${trial.sponsor}. Status: ${trial.status}. Phase: ${trial.phase}.`,
-              time: relativeTimes[idx] || `${idx + 1}d ago`
+              time: getRelativeTimeString(trial.lastUpdate)
             };
           });
           setRecentInsights(mapped);
