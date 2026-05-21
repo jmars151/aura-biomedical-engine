@@ -55,20 +55,7 @@ const getDailyStats = () => {
 };
 
 function App() {
-  const dailyStats = getDailyStats();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [comparisonList, setComparisonList] = useState([]);
-  const [showComparison, setShowComparison] = useState(false);
-  const [activeView, setActiveView] = useState('dashboard');
-  const [showProfile, setShowProfile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showPendingModal, setShowPendingModal] = useState(false);
-  const [showGlobalMapModal, setShowGlobalMapModal] = useState(false);
-
-  const pendingAnalyses = [
+  const [pendingAnalyses, setPendingAnalyses] = useState([
     { id: 'PA-001', title: 'Affinity Simulation: Imatinib derivative vs BCR-ABL', category: 'Drug Validation', status: 'simulating' },
     { id: 'PA-002', title: 'Pathogenicity Re-classification for BRCA1 Variant #821', category: 'Genomics', status: 'queued' },
     { id: 'PA-003', title: 'Ki Inhibition Constant estimation for ChEMBL25', category: 'Drug-Target Assay', status: 'running' },
@@ -84,7 +71,97 @@ function App() {
     { id: 'PA-013', title: 'IC50 comparison chart generation', category: 'Visual Report', status: 'running' },
     { id: 'PA-014', title: 'ChEMBL bioactivity dataset synchronization', category: 'Data Sync', status: 'queued' },
     { id: 'PA-015', title: 'User interface telemetry and server logs audit', category: 'Telemetry', status: 'running' }
-  ];
+  ]);
+
+  const dailyStats = { ...getDailyStats(), pending: pendingAnalyses.length.toString() };
+  const [searchQuery, setSearchQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [comparisonList, setComparisonList] = useState([]);
+  const [showComparison, setShowComparison] = useState(false);
+  const [activeView, setActiveView] = useState('dashboard');
+  const [showProfile, setShowProfile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showGlobalMapModal, setShowGlobalMapModal] = useState(false);
+
+  // Generate random pending analysis items
+  const generateRandomAnalysis = () => {
+    const molecules = ['Imatinib', 'AURA-928', 'Lapatinib', 'Gefitinib', 'Vemurafenib', 'Sorafenib', 'Dasatinib', 'Nilotinib'];
+    const targets = ['BCR-ABL', 'EGFR', 'BRAF', 'HER2', 'VEGFR2', 'PDGFR', 'KIT', 'ALK'];
+    const genes = ['BRCA1', 'BRCA2', 'TP53', 'EGFR', 'KRAS', 'ALK', 'MYC', 'APC'];
+    const categories = ['Drug Validation', 'Genomics', 'Drug-Target Assay', 'Compound Profile', 'Clinical Compliance', 'Molecular Chemistry', 'Toxicology Review', 'Phylogeny'];
+    
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    let title;
+    
+    switch (category) {
+      case 'Drug Validation':
+        title = `Affinity Simulation: ${molecules[Math.floor(Math.random() * molecules.length)]} vs ${targets[Math.floor(Math.random() * targets.length)]}`;
+        break;
+      case 'Genomics':
+        title = `Pathogenicity Re-classification for ${genes[Math.floor(Math.random() * genes.length)]} Variant #${Math.floor(Math.random() * 900) + 100}`;
+        break;
+      case 'Drug-Target Assay':
+        title = `Ki Inhibition Constant estimation for ChEMBL${Math.floor(Math.random() * 90000) + 10000}`;
+        break;
+      case 'Compound Profile':
+        title = `Target Engagement Model for ${molecules[Math.floor(Math.random() * molecules.length)]}`;
+        break;
+      case 'Clinical Compliance':
+        title = `Phase II Protocol Alignment check for NCT0${Math.floor(Math.random() * 90000000) + 10000000}`;
+        break;
+      default:
+        title = `Structure-Activity Relationship mapping for ${molecules[Math.floor(Math.random() * molecules.length)]}`;
+    }
+    
+    const statuses = ['queued', 'running', 'simulating'];
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    const id = `PA-${Math.floor(Math.random() * 900) + 100}`;
+    return { id, title, category, status };
+  };
+
+  // Simulate analysis pipeline progress updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPendingAnalyses((prev) => {
+        const rand = Math.random();
+        
+        // Complete an active task (remove it) - 40% chance if there are items
+        if (rand < 0.4 && prev.length > 3) {
+          const activeIndices = prev.map((item, idx) => (item.status === 'running' || item.status === 'simulating') ? idx : -1).filter(idx => idx !== -1);
+          if (activeIndices.length > 0) {
+            const indexToRemove = activeIndices[Math.floor(Math.random() * activeIndices.length)];
+            return prev.filter((_, idx) => idx !== indexToRemove);
+          }
+        }
+        
+        // Start a queued task (queued -> running/simulating) - 30% chance
+        if (rand < 0.7) {
+          const queuedIndices = prev.map((item, idx) => item.status === 'queued' ? idx : -1).filter(idx => idx !== -1);
+          if (queuedIndices.length > 0) {
+            const indexToStart = queuedIndices[Math.floor(Math.random() * queuedIndices.length)];
+            const nextStatus = Math.random() > 0.5 ? 'running' : 'simulating';
+            return prev.map((item, idx) => idx === indexToStart ? { ...item, status: nextStatus } : item);
+          }
+        }
+        
+        // Add a new queued task - 30% chance or if count gets low
+        if (prev.length < 15) {
+          const newTask = generateRandomAnalysis();
+          if (!prev.some(item => item.id === newTask.id)) {
+            return [...prev, newTask];
+          }
+        }
+        
+        return prev;
+      });
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Insights live feed state
   const [recentInsights, setRecentInsights] = useState([]);
