@@ -605,19 +605,31 @@
   background: var(--scrollbar-thumb);
   border-radius: 10px;
   position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.toggle.active::after {
+.toggle::after {
   content: '';
   position: absolute;
-  right: 2px;
+  left: 2px;
   top: 2px;
   width: 16px;
   height: 16px;
-  background: var(--accent-primary);
+  background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 8px var(--accent-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.toggle.active {
+  background: var(--accent-primary);
+}
+
+.toggle.active::after {
+  transform: translateX(20px);
+}
+
 
 .source-item {
   display: flex;
