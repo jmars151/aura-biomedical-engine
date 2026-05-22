@@ -28,3 +28,17 @@ dist-ssr
 .env.*
 !.env.example
 
+# Vercel
+.vercel
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# Linter Cache
+.eslintcache
+
+# Windows OS Metadata
+Thumbs.db
+ehthumbs.db
+desktop.ini
