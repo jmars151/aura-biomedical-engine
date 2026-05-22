@@ -644,6 +644,19 @@
   font-size: 12px;
 }
 
+.status-offline {
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.status-checking {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .trials-table-container {
   padding: 0 20px 20px 20px;
   overflow-x: auto;

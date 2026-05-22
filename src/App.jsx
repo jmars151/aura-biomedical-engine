@@ -2148,6 +2148,73 @@ function TrialsView() {
 }
 
 function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkMode, setDarkMode }) {
+  const [statuses, setStatuses] = useState({
+    chembl: 'checking',
+    uniprot: 'checking',
+    clinicaltrials: 'checking'
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    const checkChEMBL = async () => {
+      try {
+        const res = await fetch('https://www.ebi.ac.uk/chembl/api/data/status.json');
+        if (res.ok) return 'online';
+        
+        const res2 = await fetch('https://www.ebi.ac.uk/chembl/api/data/molecule.json?limit=1&format=json');
+        return res2.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkUniProt = async () => {
+      try {
+        const res = await fetch('https://rest.uniprot.org/uniprotkb/search?query=accession:P38398&format=json&size=1');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkClinicalTrials = async () => {
+      try {
+        const res = await fetch('https://clinicaltrials.gov/api/v2/studies?pageSize=1');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkAll = async () => {
+      const [chembl, uniprot, clinicaltrials] = await Promise.all([
+        checkChEMBL(),
+        checkUniProt(),
+        checkClinicalTrials()
+      ]);
+      if (active) {
+        setStatuses({ chembl, uniprot, clinicaltrials });
+      }
+    };
+
+    checkAll();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const renderStatus = (status) => {
+    if (status === 'online') {
+      return <span className="status-online">Online</span>;
+    } else if (status === 'offline') {
+      return <span className="status-offline">Offline</span>;
+    } else {
+      return <span className="status-checking">Checking...</span>;
+    }
+  };
+
   return (
     <div className="secondary-view animate-fade-in">
       <header className="section-header">
@@ -2184,8 +2251,9 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
         </div>
         <div className="glass-card settings-card">
           <h3>Data Sources</h3>
-          <div className="source-item"><span>ChEMBL API</span> <span className="status-online">Online</span></div>
-          <div className="source-item"><span>UniProt REST</span> <span className="status-online">Online</span></div>
+          <div className="source-item"><span>ChEMBL API</span> {renderStatus(statuses.chembl)}</div>
+          <div className="source-item"><span>UniProt REST</span> {renderStatus(statuses.uniprot)}</div>
+          <div className="source-item"><span>ClinicalTrials.gov</span> {renderStatus(statuses.clinicaltrials)}</div>
         </div>
       </div>
     </div>
