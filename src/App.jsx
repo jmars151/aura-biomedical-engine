@@ -10,14 +10,19 @@ import './DetailView.css';
 import './InteractionMap.css';
 import './BindingVisualizer.css';
 
-const GoogleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px' }}>
-    <path d="M17.64 9.20455C17.64 8.56636 17.5827 7.95273 17.4764 7.36364H9V10.845H13.8436C13.635 11.97 13.0009 12.9232 12.0477 13.5614V15.8195H14.9564C16.6582 14.2527 17.64 11.9455 17.64 9.20455Z" fill="#4285F4"/>
-    <path d="M9 18C11.43 18 13.4673 17.1941 14.9577 15.8195L12.0491 13.5614C11.2418 14.1027 10.2109 14.4273 9 14.4273C6.65591 14.4273 4.67182 12.8455 3.96409 10.7182H0.957275V13.0491C2.43818 15.9832 5.48182 18 9 18Z" fill="#34A853"/>
-    <path d="M3.96409 10.7182C3.78409 10.1823 3.68182 9.60545 3.68182 9C3.68182 8.39455 3.78409 7.81773 3.96409 7.28182V4.95091H0.957275C0.347727 6.16773 0 7.54773 0 9C0 10.4523 0.347727 11.8323 0.957275 13.0491L3.96409 10.7182Z" fill="#FBBC05"/>
-    <path d="M9 3.57273C10.3214 3.57273 11.5077 4.02545 12.4405 4.91727L15.0218 2.33591C13.4632 0.887727 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.95091L3.96409 7.28182C4.67182 5.15455 6.65591 3.57273 9 3.57273Z" fill="#EA4335"/>
-  </svg>
-);
+const decodeJwt = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to decode JWT token", e);
+    return null;
+  }
+};
 
 // Deterministic daily values based on current date
 const getDailyStats = () => {
@@ -708,6 +713,64 @@ function App() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showNotifications]);
 
+  const handleCredentialResponse = useCallback((response) => {
+    setIsLoggingIn(true);
+    try {
+      const idToken = response.credential;
+      const payload = decodeJwt(idToken);
+      
+      if (payload && payload.email) {
+        const userData = {
+          email: payload.email,
+          name: payload.name || payload.given_name || 'Google Researcher',
+          role: payload.email.endsWith('@aura.org') ? 'Admin Access' : 'Standard Access',
+          avatarSeed: payload.picture || payload.given_name || 'google',
+          isGoogle: true
+        };
+        
+        setTimeout(() => {
+          setCurrentUser(userData);
+          localStorage.setItem('aura_current_user', JSON.stringify(userData));
+          setIsLoggingIn(false);
+          
+          // Seed welcome message for this specific Google user profile
+          const welcomeMsg = {
+            id: 'welcome_' + Date.now(),
+            title: 'Welcome to AURA!',
+            message: `Hello ${userData.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+            type: 'welcome'
+          };
+          
+          const userKey = `aura_user_data_${userData.email}`;
+          const savedData = localStorage.getItem(userKey);
+          if (savedData) {
+            try {
+              const parsed = JSON.parse(savedData);
+              if (parsed.notifications && parsed.notifications.length > 0) {
+                setNotifications(parsed.notifications);
+              } else {
+                setNotifications([welcomeMsg]);
+              }
+            } catch {
+              setNotifications([welcomeMsg]);
+            }
+          } else {
+            setNotifications([welcomeMsg]);
+          }
+        }, 1000);
+      } else {
+        setIsLoggingIn(false);
+        alert("Google authentication failed: Invalid token payload");
+      }
+    } catch (error) {
+      console.error("Google login callback error:", error);
+      setIsLoggingIn(false);
+      alert("Google authentication encountered an error.");
+    }
+  }, [setCurrentUser, setIsLoggingIn, setNotifications]);
+
   const handleMockLogin = (userData) => {
     setIsLoggingIn(true);
     setTimeout(() => {
@@ -728,7 +791,8 @@ function App() {
       email,
       name: formattedName,
       role: 'Standard Access',
-      avatarSeed: name
+      avatarSeed: name,
+      isGoogle: false
     };
     handleMockLogin(userData);
   };
@@ -740,6 +804,52 @@ function App() {
     setNotifications([]);
     setShowNotifications(false);
   };
+
+  // Initialize Google Sign-In button
+  useEffect(() => {
+    if (currentUser) return;
+
+    const initGoogleSignIn = () => {
+      if (window.google) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+            callback: handleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          
+          const btnParent = document.getElementById("google-signin-btn-container");
+          if (btnParent) {
+            window.google.accounts.id.renderButton(
+              btnParent,
+              { 
+                theme: "filled_blue", 
+                size: "large", 
+                text: "signin_with", 
+                shape: "rectangular",
+                width: 320
+              }
+            );
+          }
+        } catch (err) {
+          console.error("Error rendering Google Sign-In button:", err);
+        }
+      }
+    };
+
+    if (window.google) {
+      initGoogleSignIn();
+    } else {
+      const timer = setInterval(() => {
+        if (window.google) {
+          initGoogleSignIn();
+          clearInterval(timer);
+        }
+      }, 100);
+      return () => clearInterval(timer);
+    }
+  }, [currentUser, handleCredentialResponse]);
 
   const handleLogoClick = () => {
     setActiveView('dashboard');
@@ -815,9 +925,28 @@ function App() {
               <p>Authenticating credentials...</p>
             </div>
           ) : (
-            <div className="login-content">
-              <p className="login-instruction">Select a simulated Google Account to sign in:</p>
-              
+            <div className="login-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="google-signin-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <p className="login-instruction" style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Sign in with your Google Account:
+                </p>
+                <div id="google-signin-btn-container" style={{ display: 'flex', justifyContent: 'center', minHeight: '44px', width: '100%', maxWidth: '320px', marginBottom: '8px' }}></div>
+                
+                {(!import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com") && (
+                  <div className="client-id-notice glass-card" style={{ padding: '12px 14px', fontSize: '11px', color: 'var(--text-muted)', border: '1px dashed rgba(139, 92, 246, 0.4)', borderRadius: '10px', marginTop: '12px', textAlign: 'left', lineHeight: '1.4', width: '100%', maxWidth: '340px' }}>
+                    <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>Setup Guide:</span> A custom Google Client ID is not configured. To authorize real Google logins, add a <code>.env</code> file in the project root:
+                    <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 8px', borderRadius: '6px', margin: '8px 0', fontFamily: 'monospace', fontSize: '10px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
+                    </pre>
+                    Authorize <code>http://localhost:5173</code> in the Google Cloud Console origins.
+                  </div>
+                )}
+              </div>
+
+              <div className="divider-or" style={{ margin: '8px 0' }}>
+                <span>or use Developer Presets (Offline)</span>
+              </div>
+
               <div className="preset-users">
                 <button 
                   className="preset-user-btn glass-card"
@@ -825,7 +954,8 @@ function App() {
                     email: 'dr.researcher@aura.org',
                     name: 'Dr. Researcher',
                     role: 'Admin Access',
-                    avatarSeed: 'researcher'
+                    avatarSeed: 'researcher',
+                    isGoogle: false
                   })}
                 >
                   <div className="user-avatar-mini researcher">DR</div>
@@ -841,7 +971,8 @@ function App() {
                     email: 'alex.carter@biotech.io',
                     name: 'Dr. Alex Carter',
                     role: 'Senior Scientist',
-                    avatarSeed: 'carter'
+                    avatarSeed: 'carter',
+                    isGoogle: false
                   })}
                 >
                   <div className="user-avatar-mini scientist">AC</div>
@@ -857,7 +988,8 @@ function App() {
                     email: 'guest.user@gmail.com',
                     name: 'Guest Researcher',
                     role: 'Standard Access',
-                    avatarSeed: 'guest'
+                    avatarSeed: 'guest',
+                    isGoogle: false
                   })}
                 >
                   <div className="user-avatar-mini guest">GR</div>
@@ -868,7 +1000,7 @@ function App() {
                 </button>
               </div>
 
-              <div className="divider-or">
+              <div className="divider-or" style={{ margin: '8px 0' }}>
                 <span>or enter a custom email</span>
               </div>
 
@@ -879,9 +1011,8 @@ function App() {
                   required
                   className="custom-login-input glass-card"
                 />
-                <button type="submit" className="google-sign-in-btn">
-                  <GoogleIcon />
-                  <span>Sign in with Google</span>
+                <button type="submit" className="google-sign-in-btn dev-bypass-btn">
+                  <span>Developer Bypass Sign-In</span>
                 </button>
               </form>
             </div>
@@ -953,8 +1084,9 @@ function App() {
         <div className="profile-wrapper">
           {showProfile && (
             <div className="profile-popover glass-card animate-fade-in">
-              <div className="popover-header">
-                <h3>{currentUser.role}</h3>
+              <div className="popover-header" style={{ marginBottom: '8px' }}>
+                <h3 style={{ margin: 0 }}>{currentUser.role}</h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', wordBreak: 'break-all' }}>{currentUser.email}</span>
               </div>
               <div className="popover-content">
                 <div 
@@ -980,8 +1112,25 @@ function App() {
             </div>
           )}
           <div className="profile-section" onClick={() => setShowProfile(!showProfile)}>
-            <div className="profile-badge">
-              <span className="profile-initials">
+            <div className="profile-badge" style={{ overflow: 'hidden', padding: 0 }}>
+              {currentUser.avatarSeed && (currentUser.avatarSeed.startsWith('http') || currentUser.avatarSeed.includes('/')) ? (
+                <img 
+                  src={currentUser.avatarSeed} 
+                  alt={currentUser.name} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    const fallbackSpan = e.target.nextSibling;
+                    if (fallbackSpan) fallbackSpan.style.display = 'block';
+                  }}
+                />
+              ) : null}
+              <span 
+                className="profile-initials"
+                style={{ 
+                  display: currentUser.avatarSeed && (currentUser.avatarSeed.startsWith('http') || currentUser.avatarSeed.includes('/')) ? 'none' : 'block' 
+                }}
+              >
                 {currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
               </span>
             </div>
@@ -1025,8 +1174,9 @@ function App() {
             </div>
             {showProfile && (
               <div className="profile-popover glass-card mobile-popover animate-fade-in">
-                <div className="popover-header">
-                  <h3>{currentUser.role}</h3>
+                <div className="popover-header" style={{ marginBottom: '8px' }}>
+                  <h3 style={{ margin: 0 }}>{currentUser.role}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', wordBreak: 'break-all' }}>{currentUser.email}</span>
                 </div>
                 <div className="popover-content">
                   <div 
