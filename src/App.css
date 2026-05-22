@@ -56,7 +56,7 @@
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   color: var(--text-main);
 }
 
@@ -170,7 +170,7 @@
 }
 
 .result-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
 }
 
 .result-item-info {
@@ -272,7 +272,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   border: none;
   color: var(--text-muted);
   display: flex;
@@ -329,7 +329,7 @@
 .search-shortcut {
   font-size: 11px;
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   border-radius: 4px;
   color: var(--text-muted);
   border: 1px solid var(--border-color);
@@ -356,7 +356,7 @@
 }
 
 .icon-button:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   color: var(--text-main);
 }
 
@@ -507,17 +507,17 @@
   background: transparent;
 }
 .insight-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 .insight-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .insight-item {
   padding: 16px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -525,7 +525,7 @@
 }
 
 .insight-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-medium);
 }
 
 .insight-content h4 {
@@ -602,7 +602,7 @@
 .toggle {
   width: 40px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
   position: relative;
 }
@@ -648,11 +648,11 @@
   background: transparent;
 }
 .trials-table-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 .trials-table-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .trials-table {
@@ -803,7 +803,7 @@
 }
 
 .popover-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   color: var(--text-main);
 }
 
@@ -823,7 +823,7 @@
 }
 
 .bio-stat {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-medium);
   padding: 12px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -907,7 +907,7 @@
   }
 
   .hamburger-btn:active {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-medium);
   }
 
   .mobile-logo {
@@ -986,7 +986,7 @@
   }
 
   .compare-count {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--scrollbar-thumb-hover);
     padding: 1px 5px;
     border-radius: 4px;
     font-size: 10px;
@@ -1087,7 +1087,7 @@
     display: flex !important;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-heavy);
     border: none;
     color: var(--text-muted);
     width: 44px;
@@ -1101,7 +1101,7 @@
 
   .sidebar-close-btn:hover {
     color: var(--text-main);
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--overlay-heavy);
   }
 
   /* Section headers and details styling on mobile */
@@ -1277,7 +1277,7 @@
   padding: 12px 16px;
   text-align: left;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
   border: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.25s ease;
@@ -1363,7 +1363,7 @@
 .custom-login-input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-medium);
   border: 1px solid var(--border-color);
   border-radius: 10px;
   color: var(--text-main);
@@ -1396,7 +1396,7 @@
 
 .google-sign-in-btn:hover {
   background: #f3f4f6;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
 
@@ -1413,7 +1413,7 @@
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .stat-card.clickable:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   border-color: rgba(139, 92, 246, 0.4);
   box-shadow: 0 10px 30px rgba(139, 92, 246, 0.1);
   transform: translateY(-2px);
@@ -1476,7 +1476,7 @@
 }
 
 .modal-close-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   color: var(--text-main);
 }
 
@@ -1493,7 +1493,7 @@
   background: transparent;
 }
 .modal-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
@@ -1509,13 +1509,13 @@
   align-items: center;
   padding: 14px 16px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: var(--overlay-light);
+  border: 1px solid var(--overlay-medium);
   transition: all 0.2s ease;
 }
 
 .pending-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-medium);
   border-color: rgba(139, 92, 246, 0.2);
 }
 
@@ -1578,7 +1578,7 @@
   transition: all 0.2s ease;
 }
 .card-header.clickable-header:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-medium);
 }
 .card-header.clickable-header:hover h3 {
   color: var(--accent-primary);
@@ -1606,8 +1606,8 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
+  border: 1px solid var(--overlay-light);
   border-radius: 12px;
   padding: 20px;
 }
@@ -1648,7 +1648,7 @@
 .geo-bar-track {
   width: 100%;
   height: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-medium);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1669,7 +1669,7 @@
 .phase-pill-card {
   padding: 16px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -1703,8 +1703,8 @@
   align-items: center;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
+  border: 1px solid var(--overlay-light);
 }
 
 .country-name {
@@ -1749,7 +1749,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
   padding: 12px 16px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -1771,7 +1771,7 @@
 }
 
 .alignment-wrapper {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--bg-panel-opaque);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 16px;
@@ -1780,7 +1780,7 @@
   font-size: 13px;
   line-height: 1.6;
   white-space: pre;
-  color: #e2e8f0;
+  color: var(--text-main);
 }
 
 .alignment-wrapper::-webkit-scrollbar {
@@ -1791,11 +1791,11 @@
   background: transparent;
 }
 .alignment-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 .alignment-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .pending-item.clickable {
@@ -1843,7 +1843,7 @@
 
 .alignment-tab-btn:hover {
   color: var(--text-main);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-medium);
 }
 
 .alignment-tab-btn.active {
@@ -1872,16 +1872,16 @@
   font-weight: 600;
   font-family: 'Outfit', sans-serif;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--overlay-medium);
+  border: 1px solid var(--overlay-heavy);
   color: var(--text-main);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .export-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--overlay-heavy);
+  border-color: var(--overlay-heavy);
   transform: translateY(-1px);
 }
 
@@ -2001,7 +2001,7 @@
   align-items: center;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
 }
 
 .notifications-popover-header h4 {
@@ -2056,11 +2056,11 @@
   background: transparent;
 }
 .notifications-popover-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 .notifications-popover-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .notifications-empty-state {
@@ -2075,7 +2075,7 @@
 }
 
 .empty-bell-icon {
-  color: rgba(255, 255, 255, 0.15);
+  color: var(--overlay-heavy);
   animation: bell-wobble 4s ease-in-out infinite;
 }
 
@@ -2096,7 +2096,7 @@
 .notification-item {
   display: flex;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--overlay-medium);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -2104,7 +2104,7 @@
 }
 
 .notification-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-light);
 }
 
 .notification-item.unread {
@@ -2224,13 +2224,13 @@
 
 /* Developer Bypass button and notice styles */
 .dev-bypass-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--overlay-medium) !important;
   color: var(--text-main) !important;
   border: 1px solid var(--border-color) !important;
 }
 
 .dev-bypass-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: var(--overlay-heavy) !important;
   border-color: var(--accent-primary) !important;
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1) !important;
   transform: translateY(-1px) !important;

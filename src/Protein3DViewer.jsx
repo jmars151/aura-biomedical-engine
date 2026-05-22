@@ -100,22 +100,19 @@ const Protein3DViewer = ({ uniprotId }) => {
           position: 'relative', 
           width: '100%', 
           height: '380px', 
-          background: 'rgba(5, 5, 10, 0.4)', 
-          borderRadius: '12px', 
           overflow: 'hidden',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: 'inset 0 0 20px rgba(0,0,0,0.6)'
+          boxShadow: 'inset 0 0 20px var(--border-color)'
         }}
       >
         {loading && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10, 10, 15, 0.95)', zIndex: 10 }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-panel-opaque)', zIndex: 10 }}>
             <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-primary)', marginBottom: '12px' }} />
             <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Retrieving AlphaFold 3D coordinates...</span>
           </div>
         )}
         
         {error && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(10, 10, 15, 0.95)', zIndex: 10, textAlign: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'var(--bg-panel-opaque)', zIndex: 10, textAlign: 'center' }}>
             <span style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</span>
             <span style={{ fontSize: '13px', color: '#ff5c5c', fontWeight: '500', marginBottom: '4px' }}>{error}</span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '280px', marginBottom: '16px' }}>Showing default 2D molecular binding diagram fallback.</span>
@@ -134,13 +131,13 @@ const Protein3DViewer = ({ uniprotId }) => {
               position: 'absolute', 
               top: '12px', 
               right: '12px', 
-              background: 'rgba(15, 15, 20, 0.75)', 
+              background: 'var(--bg-overlay-controls)', 
               backdropFilter: 'blur(8px)',
               padding: '6px 12px', 
               borderRadius: '20px', 
               fontSize: '11px', 
               color: 'var(--text-muted)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              border: '1px solid var(--border-color)',
               pointerEvents: 'none'
             }}
           >
@@ -153,10 +150,7 @@ const Protein3DViewer = ({ uniprotId }) => {
         <div 
           className="protein-3d-legend glass-card animate-fade-in" 
           style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
             padding: '12px 16px', 
-            borderRadius: '12px', 
-            border: '1px solid rgba(255, 255, 255, 0.06)',
             display: 'flex', 
             flexWrap: 'wrap',
             justifyContent: 'space-between', 
@@ -166,7 +160,7 @@ const Protein3DViewer = ({ uniprotId }) => {
         >
           <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Model: <span style={{ fontWeight: '600', color: 'var(--text-color)' }}>AlphaFold {pdbInfo.entryId}</span>
-            <span style={{ margin: '0 8px', color: 'rgba(255,255,255,0.15)' }}>|</span>
+            <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
             Coverage: <span style={{ fontWeight: '600', color: 'var(--text-color)' }}>{pdbInfo.uniprotStart}-{pdbInfo.uniprotEnd} ({pdbInfo.uniprotSequence?.length || 0} aa)</span>
           </div>
           

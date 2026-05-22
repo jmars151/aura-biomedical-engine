@@ -3,6 +3,7 @@
 :root {
   --bg-main: #0a0a0c;
   --bg-card: rgba(22, 22, 26, 0.7);
+  --bg-header: rgba(10, 10, 12, 0.8);
   --accent-primary: #8b5cf6;
   --accent-secondary: #06b6d4;
   --text-main: #f8fafc;
@@ -10,6 +11,16 @@
   --border-color: rgba(255, 255, 255, 0.1);
   --glass-blur: 16px;
   --glow-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  
+  --overlay-light: rgba(255, 255, 255, 0.02);
+  --overlay-medium: rgba(255, 255, 255, 0.05);
+  --overlay-heavy: rgba(255, 255, 255, 0.1);
+  --bg-panel-opaque: rgba(10, 10, 15, 0.95);
+  --bg-overlay-controls: rgba(15, 15, 20, 0.75);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-card-hover: 0 12px 48px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.1);
   
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -23,6 +34,31 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body:not(.dark-theme) {
+  --bg-main: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.65);
+  --bg-header: rgba(248, 250, 252, 0.8);
+  --accent-primary: #7c3aed;
+  --accent-secondary: #0891b2;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --glow-shadow: 0 4px 20px rgba(124, 58, 237, 0.12);
+  --shadow-card: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
+  --shadow-card-hover: 0 12px 48px 0 rgba(15, 23, 42, 0.12), 0 0 20px rgba(124, 58, 237, 0.08);
+  --overlay-light: rgba(15, 23, 42, 0.02);
+  --overlay-medium: rgba(15, 23, 42, 0.04);
+  --overlay-heavy: rgba(15, 23, 42, 0.08);
+  --bg-panel-opaque: rgba(248, 250, 252, 0.95);
+  --bg-overlay-controls: rgba(241, 245, 249, 0.85);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.12);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.25);
+  
+  color-scheme: light;
+  color: var(--text-main);
+  background-color: var(--bg-main);
 }
 
 * {
@@ -49,18 +85,18 @@ h1, h2, h3, h4 {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  box-shadow: var(--shadow-card);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
   border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.1);
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
 }
 
 .glass-header {
-  background: rgba(10, 10, 12, 0.8);
+  background: var(--bg-header);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
