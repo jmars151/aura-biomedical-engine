@@ -86,6 +86,13 @@ function App() {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showGlobalMapModal, setShowGlobalMapModal] = useState(false);
 
+  // EBI Alignment Integration state
+  const [selectedAlignmentJob, setSelectedAlignmentJob] = useState(null);
+  const [alignmentResult, setAlignmentResult] = useState('');
+  const [alignmentLoading, setAlignmentLoading] = useState(false);
+  const [alignmentError, setAlignmentError] = useState('');
+  const [isSubmittingAlignment, setIsSubmittingAlignment] = useState(false);
+
   // Generate random pending analysis items
   const generateRandomAnalysis = () => {
     const molecules = ['Imatinib', 'AURA-928', 'Lapatinib', 'Gefitinib', 'Vemurafenib', 'Sorafenib', 'Dasatinib', 'Nilotinib'];
@@ -131,7 +138,7 @@ function App() {
         
         // Complete an active task (remove it) - 40% chance if there are items
         if (rand < 0.4 && prev.length > 3) {
-          const activeIndices = prev.map((item, idx) => (item.status === 'running' || item.status === 'simulating') ? idx : -1).filter(idx => idx !== -1);
+          const activeIndices = prev.map((item, idx) => ((item.status === 'running' || item.status === 'simulating') && !item.isRealJob) ? idx : -1).filter(idx => idx !== -1);
           if (activeIndices.length > 0) {
             const indexToRemove = activeIndices[Math.floor(Math.random() * activeIndices.length)];
             return prev.filter((_, idx) => idx !== indexToRemove);
@@ -140,7 +147,7 @@ function App() {
         
         // Start a queued task (queued -> running/simulating) - 30% chance
         if (rand < 0.7) {
-          const queuedIndices = prev.map((item, idx) => item.status === 'queued' ? idx : -1).filter(idx => idx !== -1);
+          const queuedIndices = prev.map((item, idx) => (item.status === 'queued' && !item.isRealJob) ? idx : -1).filter(idx => idx !== -1);
           if (queuedIndices.length > 0) {
             const indexToStart = queuedIndices[Math.floor(Math.random() * queuedIndices.length)];
             const nextStatus = Math.random() > 0.5 ? 'running' : 'simulating';
@@ -149,7 +156,8 @@ function App() {
         }
         
         // Add a new queued task - 30% chance or if count gets low
-        if (prev.length < 15) {
+        const simulatedCount = prev.filter(item => !item.isRealJob).length;
+        if (simulatedCount < 15) {
           const newTask = generateRandomAnalysis();
           if (!prev.some(item => item.id === newTask.id)) {
             return [...prev, newTask];
@@ -162,6 +170,144 @@ function App() {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Poll real EMBL-EBI jobs in real time
+  useEffect(() => {
+    const activeRealJobs = pendingAnalyses.filter(item => item.isRealJob && item.status !== 'completed' && item.status !== 'failed');
+    if (activeRealJobs.length === 0) return;
+
+    const interval = setInterval(() => {
+      activeRealJobs.forEach(async (job) => {
+        try {
+          const res = await fetch(`/api/align?jobId=${job.jobId}`);
+          if (res.ok) {
+            let data;
+            try {
+              data = await res.json();
+            } catch (jsonErr) {
+              console.error(`Failed to parse job status response as JSON for ${job.jobId}:`, jsonErr);
+              return;
+            }
+            if (data.status === 'success') {
+              const newStatus = data.jobStatus; // 'queued' | 'running' | 'completed' | 'failed'
+              if (newStatus !== job.status) {
+                setPendingAnalyses(prev => 
+                  prev.map(item => item.id === job.id ? { ...item, status: newStatus } : item)
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to poll status for job ${job.jobId}:`, error);
+        }
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [pendingAnalyses]);
+
+  // Submit multiple sequence alignment job to EBI Clustal Omega API
+  const handleRunSequenceAlignment = async () => {
+    const comparedProteins = comparisonList.filter(item => item.type === 'Protein');
+    if (comparedProteins.length < 2) return;
+
+    setIsSubmittingAlignment(true);
+    try {
+      const accessions = comparedProteins.map(p => p.id);
+      const res = await fetch('/api/align', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accessions }),
+      });
+
+      if (!res.ok) {
+        let errMsg = `Submission failed: ${res.status}`;
+        try {
+          const errData = await res.json();
+          errMsg = errData.message || errMsg;
+        } catch {
+          try {
+            const rawText = await res.text();
+            if (rawText && rawText.length < 200) errMsg = rawText;
+          } catch {
+            // ignore fallback
+          }
+        }
+        throw new Error(errMsg);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse alignment response as JSON: ${jsonErr.message}`, { cause: jsonErr });
+      }
+
+      if (data.status === 'success') {
+        const newJob = {
+          id: `PA-EBI-${data.jobId.substring(0, 8)}`,
+          title: `Clustal Omega Alignment: ${comparedProteins.map(p => p.name).join(' vs ')}`,
+          category: 'Phylogeny',
+          status: 'queued',
+          isRealJob: true,
+          jobId: data.jobId,
+          proteins: comparedProteins.map(p => `${p.name} (${p.id})`).join(', '),
+          submittedAt: new Date().toLocaleTimeString()
+        };
+
+        setPendingAnalyses(prev => [newJob, ...prev]);
+        setShowPendingModal(true);
+      } else {
+        throw new Error(data.message || 'Failed to submit alignment');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to run sequence alignment.');
+    } finally {
+      setIsSubmittingAlignment(false);
+    }
+  };
+
+  // Fetch alignment text results from EBI backend handler
+  const handleViewAlignmentResult = async (job) => {
+    setSelectedAlignmentJob(job);
+    setAlignmentLoading(true);
+    setAlignmentError('');
+    setAlignmentResult('');
+    try {
+      const res = await fetch(`/api/align?jobId=${job.jobId}&result=true`);
+      if (!res.ok) {
+        let errMsg = `Failed to fetch results: ${res.statusText || res.status}`;
+        try {
+          const rawText = await res.text();
+          if (rawText && rawText.length < 200) errMsg = rawText;
+        } catch {
+          // ignore fallback
+        }
+        throw new Error(errMsg);
+      }
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse alignment result as JSON: ${jsonErr.message}`, { cause: jsonErr });
+      }
+
+      if (data.status === 'success') {
+        setAlignmentResult(data.alignment);
+      } else {
+        throw new Error(data.message || 'Failed to fetch alignment result');
+      }
+    } catch (err) {
+      console.error(err);
+      setAlignmentError(err.message || 'An error occurred while fetching alignment results.');
+    } finally {
+      setAlignmentLoading(false);
+    }
+  };
 
   // Insights live feed state
   const [recentInsights, setRecentInsights] = useState([]);
@@ -704,9 +850,31 @@ function App() {
                   <h1>Comparative Analysis</h1>
                   <p className="subtitle">Side-by-side target evaluation</p>
                 </div>
-                <button className="back-button" onClick={() => setShowComparison(false)}>
-                  Close Comparison
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  {comparisonList.filter(item => item.type === 'Protein').length >= 2 && (
+                    <button 
+                      className="primary-button" 
+                      onClick={handleRunSequenceAlignment}
+                      disabled={isSubmittingAlignment}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      {isSubmittingAlignment ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Activity size={16} />
+                          <span>Run Sequence Alignment</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <button className="back-button" onClick={() => setShowComparison(false)}>
+                    Close Comparison
+                  </button>
+                </div>
               </header>
 
               <div className="comparison-grid">
@@ -895,17 +1063,84 @@ function App() {
             </div>
             <div className="modal-body">
               <div className="pending-list">
-                {pendingAnalyses.map((analysis) => (
-                  <div key={analysis.id} className="pending-item">
-                    <div className="pending-info">
-                      <span className="pending-category">{analysis.category}</span>
-                      <span className="pending-title">{analysis.title}</span>
+                {pendingAnalyses.map((analysis) => {
+                  const isClickable = analysis.isRealJob && analysis.status === 'completed';
+                  return (
+                    <div 
+                      key={analysis.id} 
+                      className={`pending-item ${isClickable ? 'clickable' : ''}`}
+                      onClick={() => isClickable && handleViewAlignmentResult(analysis)}
+                      title={isClickable ? "Click to view alignment results" : undefined}
+                    >
+                      <div className="pending-info">
+                        <span className="pending-category">
+                          {analysis.category} {analysis.isRealJob && <span style={{ color: 'var(--accent-primary)', fontSize: '10px', marginLeft: '6px' }}>(EMBL-EBI Live)</span>}
+                        </span>
+                        <span className="pending-title">{analysis.title}</span>
+                        {analysis.isRealJob && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Job ID: <span style={{ fontFamily: 'monospace' }}>{analysis.jobId}</span> | Submitted: {analysis.submittedAt}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`pending-status-pill ${analysis.status}`}>
+                        {analysis.status === 'simulating' ? 'Simulating...' : analysis.status}
+                      </span>
                     </div>
-                    <span className={`pending-status-pill ${analysis.status}`}>
-                      {analysis.status === 'simulating' ? 'Simulating...' : analysis.status}
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAlignmentJob && (
+        <div className="modal-backdrop" onClick={() => setSelectedAlignmentJob(null)}>
+          <div className="glass-card modal-card" style={{ maxWidth: '800px', width: '95%' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Multiple Sequence Alignment Results</h2>
+                <p className="subtitle" style={{ fontSize: '12px', margin: '4px 0 0 0' }}>EMBL-EBI Clustal Omega Service</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedAlignmentJob(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="alignment-container">
+                <div className="alignment-meta">
+                  <div className="alignment-meta-row">
+                    <span className="alignment-meta-label">Task ID</span>
+                    <span className="alignment-meta-value">{selectedAlignmentJob.id}</span>
+                  </div>
+                  <div className="alignment-meta-row">
+                    <span className="alignment-meta-label">EBI Job ID</span>
+                    <span className="alignment-meta-value">{selectedAlignmentJob.jobId}</span>
+                  </div>
+                  <div className="alignment-meta-row">
+                    <span className="alignment-meta-label">Proteins Aligned</span>
+                    <span className="alignment-meta-value" style={{ fontFamily: 'inherit', color: 'var(--text-main)' }}>
+                      {selectedAlignmentJob.proteins}
                     </span>
                   </div>
-                ))}
+                </div>
+
+                {alignmentLoading ? (
+                  <div className="placeholder-content" style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-primary)' }} />
+                    <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Retrieving alignment map from EMBL-EBI...</p>
+                  </div>
+                ) : alignmentError ? (
+                  <div className="placeholder-content" style={{ padding: '40px 0', color: '#ef4444', textAlign: 'center' }}>
+                    <p style={{ fontWeight: 'bold' }}>Failed to load alignment results</p>
+                    <p style={{ fontSize: '13px', opacity: 0.8 }}>{alignmentError}</p>
+                  </div>
+                ) : (
+                  <div className="alignment-wrapper">
+                    {alignmentResult}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1362,7 +1597,22 @@ function ContactView() {
         }),
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonErr) {
+        console.error('Failed to parse contact response as JSON:', jsonErr);
+        let errMsg = `Server error (${response.status})`;
+        try {
+          const rawText = await response.text();
+          if (rawText && rawText.length < 200) errMsg = rawText;
+        } catch {
+          // ignore fallback
+        }
+        setStatus('error');
+        setStatusMessage(errMsg);
+        return;
+      }
 
       if (response.ok && result.status === 'success') {
         setStatus('success');
