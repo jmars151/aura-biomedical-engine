@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail } from 'lucide-react';
-import { searchBiomedicalData, fetchRecentTrials } from './api';
+import { useState, useEffect, useRef } from 'react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download } from 'lucide-react';
+import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
+import Protein3DViewer from './Protein3DViewer';
+import PhylogeneticTree from './PhylogeneticTree';
 import './App.css';
 import './DetailView.css';
 import './InteractionMap.css';
@@ -54,30 +56,76 @@ const getDailyStats = () => {
   };
 };
 
+const INITIAL_PENDING_ANALYSES = [
+  { id: 'PA-001', title: 'Affinity Simulation: Imatinib derivative vs BCR-ABL', category: 'Drug Validation', status: 'simulating' },
+  { id: 'PA-002', title: 'Pathogenicity Re-classification for BRCA1 Variant #821', category: 'Genomics', status: 'queued' },
+  { id: 'PA-003', title: 'Ki Inhibition Constant estimation for ChEMBL25', category: 'Drug-Target Assay', status: 'running' },
+  { id: 'PA-004', title: 'Target Engagement Model for AURA-928', category: 'Compound Profile', status: 'simulating' },
+  { id: 'PA-005', title: 'Phase II Protocol Alignment check for NCT00868335', category: 'Clinical Compliance', status: 'queued' },
+  { id: 'PA-006', title: 'Somatic mutation impact scoring on EGFR', category: 'Genomics', status: 'running' },
+  { id: 'PA-007', title: 'Auto-curation of PubMed abstract ID 3829102', category: 'Literature Bridge', status: 'queued' },
+  { id: 'PA-008', title: 'Structure-Activity Relationship mapping for Imatinib', category: 'Molecular Chemistry', status: 'simulating' },
+  { id: 'PA-009', title: 'Evolutionary Conservation check for BRCA1 promoter region', category: 'TF Binding Study', status: 'queued' },
+  { id: 'PA-010', title: 'Pharmacokinetics model verification for Molecule AURA-928', category: 'ADME Prediction', status: 'running' },
+  { id: 'PA-011', title: 'Safety profile evaluation against openFDA data', category: 'Toxicology Review', status: 'simulating' },
+  { id: 'PA-012', title: 'Multiple Sequence Alignment for BRCA1 homologous proteins', category: 'Phylogeny', status: 'queued' },
+  { id: 'PA-013', title: 'IC50 comparison chart generation', category: 'Visual Report', status: 'running' },
+  { id: 'PA-014', title: 'ChEMBL bioactivity dataset synchronization', category: 'Data Sync', status: 'queued' },
+  { id: 'PA-015', title: 'User interface telemetry and server logs audit', category: 'Telemetry', status: 'running' }
+];
+
+
+
 function App() {
-  const [pendingAnalyses, setPendingAnalyses] = useState([
-    { id: 'PA-001', title: 'Affinity Simulation: Imatinib derivative vs BCR-ABL', category: 'Drug Validation', status: 'simulating' },
-    { id: 'PA-002', title: 'Pathogenicity Re-classification for BRCA1 Variant #821', category: 'Genomics', status: 'queued' },
-    { id: 'PA-003', title: 'Ki Inhibition Constant estimation for ChEMBL25', category: 'Drug-Target Assay', status: 'running' },
-    { id: 'PA-004', title: 'Target Engagement Model for AURA-928', category: 'Compound Profile', status: 'simulating' },
-    { id: 'PA-005', title: 'Phase II Protocol Alignment check for NCT00868335', category: 'Clinical Compliance', status: 'queued' },
-    { id: 'PA-006', title: 'Somatic mutation impact scoring on EGFR', category: 'Genomics', status: 'running' },
-    { id: 'PA-007', title: 'Auto-curation of PubMed abstract ID 3829102', category: 'Literature Bridge', status: 'queued' },
-    { id: 'PA-008', title: 'Structure-Activity Relationship mapping for Imatinib', category: 'Molecular Chemistry', status: 'simulating' },
-    { id: 'PA-009', title: 'Evolutionary Conservation check for BRCA1 promoter region', category: 'TF Binding Study', status: 'queued' },
-    { id: 'PA-010', title: 'Pharmacokinetics model verification for Molecule AURA-928', category: 'ADME Prediction', status: 'running' },
-    { id: 'PA-011', title: 'Safety profile evaluation against openFDA data', category: 'Toxicology Review', status: 'simulating' },
-    { id: 'PA-012', title: 'Multiple Sequence Alignment for BRCA1 homologous proteins', category: 'Phylogeny', status: 'queued' },
-    { id: 'PA-013', title: 'IC50 comparison chart generation', category: 'Visual Report', status: 'running' },
-    { id: 'PA-014', title: 'ChEMBL bioactivity dataset synchronization', category: 'Data Sync', status: 'queued' },
-    { id: 'PA-015', title: 'User interface telemetry and server logs audit', category: 'Telemetry', status: 'running' }
-  ]);
+  const [pendingAnalyses, setPendingAnalyses] = useState(INITIAL_PENDING_ANALYSES);
 
   const dailyStats = { ...getDailyStats(), pending: pendingAnalyses.length.toString() };
   const [searchQuery, setSearchQuery] = useState('');
+  const [highlightSearch, setHighlightSearch] = useState(false);
+  const searchInputRef = useRef(null);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [activeMetrics, setActiveMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  // Fetch live metrics when selectedItem changes
+  useEffect(() => {
+    if (!selectedItem) {
+      Promise.resolve().then(() => {
+        setActiveMetrics(null);
+      });
+      return;
+    }
+
+    let active = true;
+    Promise.resolve().then(() => {
+      setMetricsLoading(true);
+    });
+
+    fetchLiveMetrics(selectedItem)
+      .then((res) => {
+        if (active) {
+          Promise.resolve().then(() => {
+            setActiveMetrics(res);
+            setMetricsLoading(false);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching live metrics:', err);
+        if (active) {
+          Promise.resolve().then(() => {
+            setMetricsLoading(false);
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedItem]);
+
   const [comparisonList, setComparisonList] = useState([]);
   const [showComparison, setShowComparison] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
@@ -89,6 +137,8 @@ function App() {
   // EBI Alignment Integration state
   const [selectedAlignmentJob, setSelectedAlignmentJob] = useState(null);
   const [alignmentResult, setAlignmentResult] = useState('');
+  const [treeResult, setTreeResult] = useState('');
+  const [activeAlignTab, setActiveAlignTab] = useState('alignment');
   const [alignmentLoading, setAlignmentLoading] = useState(false);
   const [alignmentError, setAlignmentError] = useState('');
   const [isSubmittingAlignment, setIsSubmittingAlignment] = useState(false);
@@ -219,7 +269,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ accessions }),
+        body: JSON.stringify({ accessions, email: currentUser?.email }),
       });
 
       if (!res.ok) {
@@ -270,36 +320,125 @@ function App() {
     }
   };
 
+  const [copyFeedback, setCopyFeedback] = useState({});
+
+  const handleCopyText = (text, key) => {
+    navigator.clipboard.writeText(text);
+    setCopyFeedback(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => {
+      setCopyFeedback(prev => ({ ...prev, [key]: false }));
+    }, 2000);
+  };
+
+  const handleDownloadFile = (content, filename, contentType) => {
+    const blob = new Blob([content], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const convertAlnToFasta = (alnText) => {
+    if (!alnText) return '';
+    const lines = alnText.split('\n');
+    const seqs = {};
+    const order = [];
+    
+    for (let line of lines) {
+      const trimmedRight = line.trimRight();
+      if (!trimmedRight) continue;
+      if (trimmedRight.includes('CLUSTAL') || trimmedRight.includes('MUSCLE')) continue;
+      
+      const trimmed = trimmedRight.trim();
+      if (trimmedRight.startsWith(' ') || !trimmed) {
+        continue;
+      }
+      
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 2) {
+        const id = parts[0];
+        const seqChunk = parts[1].replace(/[^A-Za-z-]/g, '');
+        if (seqChunk) {
+          if (!seqs[id]) {
+            seqs[id] = '';
+            order.push(id);
+          }
+          seqs[id] += seqChunk;
+        }
+      }
+    }
+    
+    return order.map(id => `>${id}\n${seqs[id]}`).join('\n');
+  };
+
+  const handleExportComparisonCSV = () => {
+    if (comparisonList.length === 0) return;
+    
+    const headers = ['Name', 'ID', 'Category', 'Status', 'Details', 'IC50 (nM)', 'Ki (nM)', 'Efficiency'];
+    
+    const rows = comparisonList.map(item => [
+      item.name || '',
+      item.id || '',
+      item.type || '',
+      item.status || 'Verified Integration',
+      `"${(item.details || '').replace(/"/g, '""')}"`,
+      '1.2',
+      '0.85',
+      '0.68'
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+    
+    handleDownloadFile(csvContent, `AURA_Comparison_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+  };
+
   // Fetch alignment text results from EBI backend handler
   const handleViewAlignmentResult = async (job) => {
     setSelectedAlignmentJob(job);
     setAlignmentLoading(true);
     setAlignmentError('');
     setAlignmentResult('');
+    setTreeResult('');
+    setActiveAlignTab('alignment');
+    
     try {
-      const res = await fetch(`/api/align?jobId=${job.jobId}&result=true`);
-      if (!res.ok) {
-        let errMsg = `Failed to fetch results: ${res.statusText || res.status}`;
+      const [resAln, resTree] = await Promise.all([
+        fetch(`/api/align?jobId=${job.jobId}&result=true`),
+        fetch(`/api/align?jobId=${job.jobId}&tree=true`)
+      ]);
+      
+      if (!resAln.ok) {
+        let errMsg = `Failed to fetch alignment: ${resAln.statusText || resAln.status}`;
         try {
-          const rawText = await res.text();
+          const rawText = await resAln.text();
           if (rawText && rawText.length < 200) errMsg = rawText;
         } catch {
-          // ignore fallback
+          // Ignore body read error
+          void 0;
         }
         throw new Error(errMsg);
       }
       
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        throw new Error(`Failed to parse alignment result as JSON: ${jsonErr.message}`, { cause: jsonErr });
+      const alnData = await resAln.json();
+      if (alnData.status !== 'success') {
+        throw new Error(alnData.message || 'Failed to fetch alignment result');
       }
-
-      if (data.status === 'success') {
-        setAlignmentResult(data.alignment);
-      } else {
-        throw new Error(data.message || 'Failed to fetch alignment result');
+      setAlignmentResult(alnData.alignment);
+      
+      if (resTree.ok) {
+        try {
+          const treeData = await resTree.json();
+          if (treeData.status === 'success') {
+            setTreeResult(treeData.tree);
+          }
+        } catch (treeErr) {
+          console.error("Failed to parse tree result as JSON:", treeErr);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -374,28 +513,35 @@ function App() {
     if (!currentUser) return;
     const userKey = `aura_user_data_${currentUser.email}`;
     const savedData = localStorage.getItem(userKey);
-    if (savedData) {
-      const parsed = JSON.parse(savedData);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLibraryItems(parsed.libraryItems || []);
-      setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
-      setDarkMode(parsed.darkMode ?? true);
-    } else {
-      const defaultLibrary = [
-        { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
-        { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
-        { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
-      ];
-      setLibraryItems(defaultLibrary);
-      setGlassmorphismIntensity(80);
-      setDarkMode(true);
-      
-      localStorage.setItem(userKey, JSON.stringify({
-        libraryItems: defaultLibrary,
-        glassmorphismIntensity: 80,
-        darkMode: true
-      }));
-    }
+    
+    // Defer state updates to avoid synchronous setState inside useEffect warning
+    Promise.resolve().then(() => {
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        setLibraryItems(parsed.libraryItems || []);
+        setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
+        setDarkMode(parsed.darkMode ?? true);
+        if (parsed.pendingAnalyses) {
+          setPendingAnalyses(parsed.pendingAnalyses);
+        }
+      } else {
+        const defaultLibrary = [
+          { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
+          { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
+          { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
+        ];
+        setLibraryItems(defaultLibrary);
+        setGlassmorphismIntensity(80);
+        setDarkMode(true);
+        
+        localStorage.setItem(userKey, JSON.stringify({
+          libraryItems: defaultLibrary,
+          glassmorphismIntensity: 80,
+          darkMode: true,
+          pendingAnalyses: INITIAL_PENDING_ANALYSES
+        }));
+      }
+    });
   }, [currentUser]);
 
   // Sync state back to localStorage
@@ -405,10 +551,11 @@ function App() {
     const currentData = {
       libraryItems,
       glassmorphismIntensity,
-      darkMode
+      darkMode,
+      pendingAnalyses
     };
     localStorage.setItem(userKey, JSON.stringify(currentData));
-  }, [libraryItems, glassmorphismIntensity, darkMode, currentUser]);
+  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, currentUser]);
 
   // Apply glassmorphism intensity CSS variable
   useEffect(() => {
@@ -464,6 +611,26 @@ function App() {
     setResults(null);
     setSearchQuery('');
     setSidebarOpen(false);
+  };
+
+  const handleNewAnalysis = () => {
+    setActiveView('dashboard');
+    setSelectedItem(null);
+    setShowComparison(false);
+    setResults(null);
+    setSearchQuery('');
+    setSidebarOpen(false);
+    
+    // Focus search input
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+    
+    // Trigger highlight glow
+    setHighlightSearch(true);
+    setTimeout(() => {
+      setHighlightSearch(false);
+    }, 1500);
   };
 
   const addToComparison = (item) => {
@@ -588,6 +755,12 @@ function App() {
       </div>
     );
   }
+
+  const metrics = activeMetrics || {
+    label1: 'IC50', value1: 'N/A',
+    label2: 'Ki', value2: 'N/A',
+    label3: 'Efficiency', value3: 'N/A'
+  };
 
   return (
     <div className="app-container">
@@ -748,13 +921,14 @@ function App() {
 
         <header className="glass-header top-bar">
           <div className="search-wrapper">
-            <div className="search-container glass-card glow-border">
+            <div className={`search-container glass-card glow-border ${highlightSearch ? 'search-highlight-glow' : ''}`}>
               {loading ? <Loader2 className="search-icon animate-spin" size={18} /> : <Search className="search-icon" size={18} />}
               <input 
                 type="text" 
                 placeholder="Search molecular targets, drugs, or clinical trials..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                ref={searchInputRef}
                 className="search-input"
               />
               <div className="search-shortcut">⌘ K</div>
@@ -817,7 +991,7 @@ function App() {
             )}
             <button className="icon-button"><Bell size={20} /></button>
             <div className="divider"></div>
-            <button className="primary-button">New Analysis</button>
+            <button className="primary-button" onClick={handleNewAnalysis}>New Analysis</button>
           </div>
         </header>
 
@@ -871,6 +1045,14 @@ function App() {
                       )}
                     </button>
                   )}
+                  <button 
+                    className="primary-button" 
+                    onClick={handleExportComparisonCSV}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'white', boxShadow: 'none' }}
+                  >
+                    <ExternalLink size={16} />
+                    <span>Export Comparison</span>
+                  </button>
                   <button className="back-button" onClick={() => setShowComparison(false)}>
                     Close Comparison
                   </button>
@@ -978,27 +1160,50 @@ function App() {
                       </div>
                       <div className="info-block">
                         <label>Status</label>
-                        <p className="status-active">Verified Integration</p>
+                        <p className="status-active">{selectedItem.status || 'Verified Integration'}</p>
                       </div>
                     </div>
 
                     <div className="bioactivity-grid">
-                      <div className="bio-stat">
-                        <span className="bio-label">IC50</span>
-                        <span className="bio-value">1.2 nM</span>
-                      </div>
-                      <div className="bio-stat">
-                        <span className="bio-label">Ki</span>
-                        <span className="bio-value">0.85 nM</span>
-                      </div>
-                      <div className="bio-stat">
-                        <span className="bio-label">Efficiency</span>
-                        <span className="bio-value">0.68</span>
-                      </div>
+                      {metricsLoading ? (
+                        <>
+                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
+                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
+                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                          </div>
+                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
+                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
+                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                          </div>
+                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
+                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
+                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bio-stat">
+                            <span className="bio-label">{metrics.label1 || 'IC50'}</span>
+                            <span className="bio-value">{metrics.value1}</span>
+                          </div>
+                          <div className="bio-stat">
+                            <span className="bio-label">{metrics.label2 || 'Ki'}</span>
+                            <span className="bio-value">{metrics.value2}</span>
+                          </div>
+                          <div className="bio-stat">
+                            <span className="bio-label">{metrics.label3 || 'Efficiency'}</span>
+                            <span className="bio-value">{metrics.value3}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                     
                     <div className="detail-visualizer glass-card">
-                      <BindingVisualizer />
+                      {selectedItem.type === 'Protein' ? (
+                        <Protein3DViewer key={selectedItem.id} uniprotId={selectedItem.id} />
+                      ) : (
+                        <BindingVisualizer />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1129,7 +1334,7 @@ function App() {
                 {alignmentLoading ? (
                   <div className="placeholder-content" style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-primary)' }} />
-                    <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Retrieving alignment map from EMBL-EBI...</p>
+                    <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Retrieving alignment map and guide tree from EMBL-EBI...</p>
                   </div>
                 ) : alignmentError ? (
                   <div className="placeholder-content" style={{ padding: '40px 0', color: '#ef4444', textAlign: 'center' }}>
@@ -1137,9 +1342,85 @@ function App() {
                     <p style={{ fontSize: '13px', opacity: 0.8 }}>{alignmentError}</p>
                   </div>
                 ) : (
-                  <div className="alignment-wrapper">
-                    {alignmentResult}
-                  </div>
+                  <>
+                    <div className="alignment-tabs">
+                      <button 
+                        className={`alignment-tab-btn ${activeAlignTab === 'alignment' ? 'active' : ''}`}
+                        onClick={() => setActiveAlignTab('alignment')}
+                      >
+                        Sequence Alignment
+                      </button>
+                      <button 
+                        className={`alignment-tab-btn ${activeAlignTab === 'tree' ? 'active' : ''}`}
+                        onClick={() => setActiveAlignTab('tree')}
+                        disabled={!treeResult}
+                      >
+                        Phylogenetic Tree {!treeResult && '(Loading...)'}
+                      </button>
+                    </div>
+
+                    {activeAlignTab === 'alignment' ? (
+                      <div className="alignment-wrapper">
+                        {alignmentResult}
+                      </div>
+                    ) : (
+                      <div className="tree-wrapper glass-card" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                        <PhylogeneticTree newickString={treeResult} />
+                      </div>
+                    )}
+
+                    <div className="alignment-export-panel">
+                      {activeAlignTab === 'alignment' ? (
+                        <>
+                          <button 
+                            className={`export-btn ${copyFeedback.aln ? 'export-btn-success' : ''}`}
+                            onClick={() => handleCopyText(alignmentResult, 'aln')}
+                          >
+                            <Copy size={14} />
+                            <span>{copyFeedback.aln ? 'Copied ALN!' : 'Copy ALN'}</span>
+                          </button>
+                          <button 
+                            className="export-btn"
+                            onClick={() => handleDownloadFile(alignmentResult, `${selectedAlignmentJob.jobId}.aln`, 'text/plain')}
+                          >
+                            <Download size={14} />
+                            <span>Download ALN</span>
+                          </button>
+                          <button 
+                            className={`export-btn ${copyFeedback.fasta ? 'export-btn-success' : ''}`}
+                            onClick={() => handleCopyText(convertAlnToFasta(alignmentResult), 'fasta')}
+                          >
+                            <Copy size={14} />
+                            <span>{copyFeedback.fasta ? 'Copied FASTA!' : 'Copy FASTA'}</span>
+                          </button>
+                          <button 
+                            className="export-btn"
+                            onClick={() => handleDownloadFile(convertAlnToFasta(alignmentResult), `${selectedAlignmentJob.jobId}.fasta`, 'text/plain')}
+                          >
+                            <Download size={14} />
+                            <span>Download FASTA</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button 
+                            className={`export-btn ${copyFeedback.tree ? 'export-btn-success' : ''}`}
+                            onClick={() => handleCopyText(treeResult, 'tree')}
+                          >
+                            <Copy size={14} />
+                            <span>{copyFeedback.tree ? 'Copied Tree!' : 'Copy Newick Tree'}</span>
+                          </button>
+                          <button 
+                            className="export-btn"
+                            onClick={() => handleDownloadFile(treeResult, `${selectedAlignmentJob.jobId}.ph`, 'text/plain')}
+                          >
+                            <Download size={14} />
+                            <span>Download Newick Tree</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

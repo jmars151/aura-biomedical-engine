@@ -127,6 +127,13 @@
   align-items: center;
   padding: 10px 16px;
   gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.search-highlight-glow {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.6) !important;
+  transform: scale(1.02);
 }
 
 .search-results {
@@ -1812,5 +1819,78 @@
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);
 }
 
+/* Alignment Modal Tabs & Export Widget styling */
+.alignment-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
 
+.alignment-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
 
+.alignment-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.alignment-tab-btn.active {
+  color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.1);
+}
+
+.alignment-export-panel {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.export-btn:active {
+  transform: translateY(1px);
+}
+
+.export-btn-success {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #10b981 !important;
+}
