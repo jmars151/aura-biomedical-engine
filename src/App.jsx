@@ -299,7 +299,7 @@ function App() {
     return () => clearInterval(interval);
   }, [pendingAnalyses]);
 
-  // Observe changes in pendingAnalyses to trigger notifications for task additions, completions, and transitions
+  // Observe changes in pendingAnalyses to trigger notifications for real EBI task additions, completions, and transitions
   useEffect(() => {
     const prevAnalyses = prevAnalysesRef.current;
     
@@ -311,12 +311,6 @@ function App() {
           addNotification(
             'Alignment Job Submitted',
             `Live EMBL-EBI sequence alignment job initiated: ${item.title}.`,
-            'info'
-          );
-        } else {
-          addNotification(
-            'Pipeline Run Queued',
-            `${item.title} has entered the simulation queue.`,
             'info'
           );
         }
@@ -336,20 +330,6 @@ function App() {
               'error'
             );
           }
-        }
-      }
-    });
-
-    // Detect removed simulated tasks (removal from pending list = completion)
-    prevAnalyses.forEach(prevItem => {
-      const currentItem = pendingAnalyses.find(c => c.id === prevItem.id);
-      if (!currentItem) {
-        if (!prevItem.isRealJob) {
-          addNotification(
-            'Pipeline Run Complete',
-            `${prevItem.title} completed successfully.`,
-            'success'
-          );
         }
       }
     });
