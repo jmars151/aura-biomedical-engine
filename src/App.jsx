@@ -638,8 +638,6 @@ function App() {
     if (!comparisonList.find(i => i.id === item.id)) {
       setComparisonList([...comparisonList, item]);
     }
-    setResults(null);
-    setSearchQuery('');
   };
 
   const removeFromComparison = (id) => {
@@ -956,15 +954,17 @@ function App() {
                           </div>
                           <div className="result-item-actions">
                             <span className="result-item-id">{item.id}</span>
-                            <button 
-                              className="add-compare-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToComparison(item);
-                              }}
-                            >
-                              + Compare
-                            </button>
+                            {type !== 'trials' && item.type !== 'Clinical Trial' && item.type !== 'Study' && !(item.id && item.id.startsWith('NCT')) && (
+                              <button 
+                                className="add-compare-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToComparison(item);
+                                }}
+                              >
+                                + Compare
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1142,12 +1142,18 @@ function App() {
                         <p className="id-tag">{selectedItem.id}</p>
                       </div>
                       <a 
-                        href={`https://google.com/search?q=${selectedItem.id}+${selectedItem.name}`} 
+                        href={selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
+                          ? `https://clinicaltrials.gov/study/${selectedItem.id}`
+                          : `https://google.com/search?q=${selectedItem.id}+${selectedItem.name}`
+                        } 
                         target="_blank" 
                         rel="noreferrer"
                         className="external-link"
                       >
-                        Source Data <ExternalLink size={14} />
+                        {selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
+                          ? 'View Clinical Trial'
+                          : 'Source Data'
+                        } <ExternalLink size={14} />
                       </a>
                     </div>
                   </header>
@@ -1756,8 +1762,26 @@ function TrialsView() {
               <tbody>
                 {trials.map((trial) => (
                   <tr key={trial.id}>
-                    <td className="trial-id">{trial.id}</td>
-                    <td className="trial-title">{trial.title}</td>
+                    <td className="trial-id">
+                      <a 
+                        href={`https://clinicaltrials.gov/study/${trial.id}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="trial-link"
+                      >
+                        {trial.id} <ExternalLink size={12} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                      </a>
+                    </td>
+                    <td className="trial-title" title={trial.title}>
+                      <a 
+                        href={`https://clinicaltrials.gov/study/${trial.id}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="trial-link-title"
+                      >
+                        {trial.title}
+                      </a>
+                    </td>
                     <td><span className={`status-badge ${trial.status.toLowerCase()}`}>{trial.status}</span></td>
                     <td>{trial.phase}</td>
                     <td className="trial-sponsor">{trial.sponsor}</td>

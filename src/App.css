@@ -1894,3 +1894,31 @@
   border-color: rgba(16, 185, 129, 0.3) !important;
   color: #10b981 !important;
 }
+
+/* Clinical Trial External Links */
+.trial-link {
+  color: var(--accent-primary) !important;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trial-link:hover {
+  color: var(--accent-secondary) !important;
+  text-decoration: underline;
+}
+
+.trial-link-title {
+  color: var(--text-main) !important;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.trial-link-title:hover {
+  color: var(--accent-secondary) !important;
+  text-decoration: underline;
+}
