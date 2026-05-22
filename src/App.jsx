@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics } from './api';
 import InteractionMap from './InteractionMap';
@@ -78,6 +78,44 @@ const INITIAL_PENDING_ANALYSES = [
 
 function App() {
   const [pendingAnalyses, setPendingAnalyses] = useState(INITIAL_PENDING_ANALYSES);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const prevAnalysesRef = useRef(pendingAnalyses);
+
+  const addNotification = useCallback((title, message, type = 'info') => {
+    const newNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      message,
+      type,
+      read: false,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+  }, []);
+
+  const markAsRead = useCallback((id) => {
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+  }, []);
+
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => 
+      prev.map(n => ({ ...n, read: true }))
+    );
+  }, []);
+
+  const deleteNotification = useCallback((id, e) => {
+    if (e) e.stopPropagation();
+    setNotifications(prev => 
+      prev.filter(n => n.id !== id)
+    );
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
   const dailyStats = { ...getDailyStats(), pending: pendingAnalyses.length.toString() };
   const [searchQuery, setSearchQuery] = useState('');
@@ -255,6 +293,64 @@ function App() {
 
     return () => clearInterval(interval);
   }, [pendingAnalyses]);
+
+  // Observe changes in pendingAnalyses to trigger notifications for task additions, completions, and transitions
+  useEffect(() => {
+    const prevAnalyses = prevAnalysesRef.current;
+    
+    // Detect added tasks
+    pendingAnalyses.forEach(item => {
+      const prevItem = prevAnalyses.find(p => p.id === item.id);
+      if (!prevItem) {
+        if (item.isRealJob) {
+          addNotification(
+            'Alignment Job Submitted',
+            `Live EMBL-EBI sequence alignment job initiated: ${item.title}.`,
+            'info'
+          );
+        } else {
+          addNotification(
+            'Pipeline Run Queued',
+            `${item.title} has entered the simulation queue.`,
+            'info'
+          );
+        }
+      } else {
+        // Detect state transitions of existing tasks
+        if (item.status !== prevItem.status) {
+          if (item.status === 'completed') {
+            addNotification(
+              'Alignment Complete',
+              `Multiple Sequence Alignment is ready for review: ${item.title}.`,
+              'success'
+            );
+          } else if (item.status === 'failed') {
+            addNotification(
+              'Alignment Failed',
+              `Alignment job failed: ${item.title}. Please check accession codes or email settings.`,
+              'error'
+            );
+          }
+        }
+      }
+    });
+
+    // Detect removed simulated tasks (removal from pending list = completion)
+    prevAnalyses.forEach(prevItem => {
+      const currentItem = pendingAnalyses.find(c => c.id === prevItem.id);
+      if (!currentItem) {
+        if (!prevItem.isRealJob) {
+          addNotification(
+            'Pipeline Run Complete',
+            `${prevItem.title} completed successfully.`,
+            'success'
+          );
+        }
+      }
+    });
+
+    prevAnalysesRef.current = pendingAnalyses;
+  }, [pendingAnalyses, addNotification]);
 
   // Submit multiple sequence alignment job to EBI Clustal Omega API
   const handleRunSequenceAlignment = async () => {
@@ -523,6 +619,20 @@ function App() {
         setDarkMode(parsed.darkMode ?? true);
         if (parsed.pendingAnalyses) {
           setPendingAnalyses(parsed.pendingAnalyses);
+          prevAnalysesRef.current = parsed.pendingAnalyses;
+        }
+        if (parsed.notifications !== undefined) {
+          setNotifications(parsed.notifications);
+        } else {
+          const welcomeMsg = {
+            id: `welcome-${Date.now()}`,
+            title: 'Welcome to AURA!',
+            message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
+            type: 'welcome',
+            read: false,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+          };
+          setNotifications([welcomeMsg]);
         }
       } else {
         const defaultLibrary = [
@@ -530,15 +640,26 @@ function App() {
           { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
           { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
         ];
+        const welcomeMsg = {
+          id: `welcome-${Date.now()}`,
+          title: 'Welcome to AURA!',
+          message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
+          type: 'welcome',
+          read: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+        };
         setLibraryItems(defaultLibrary);
         setGlassmorphismIntensity(80);
         setDarkMode(true);
+        setNotifications([welcomeMsg]);
+        prevAnalysesRef.current = INITIAL_PENDING_ANALYSES;
         
         localStorage.setItem(userKey, JSON.stringify({
           libraryItems: defaultLibrary,
           glassmorphismIntensity: 80,
           darkMode: true,
-          pendingAnalyses: INITIAL_PENDING_ANALYSES
+          pendingAnalyses: INITIAL_PENDING_ANALYSES,
+          notifications: [welcomeMsg]
         }));
       }
     });
@@ -552,10 +673,11 @@ function App() {
       libraryItems,
       glassmorphismIntensity,
       darkMode,
-      pendingAnalyses
+      pendingAnalyses,
+      notifications
     };
     localStorage.setItem(userKey, JSON.stringify(currentData));
-  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, currentUser]);
+  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser]);
 
   // Apply glassmorphism intensity CSS variable
   useEffect(() => {
@@ -572,6 +694,19 @@ function App() {
       document.body.style.background = 'radial-gradient(circle at 50% -20%, #e0e7ff 0%, #f8fafc 100%)';
     }
   }, [darkMode]);
+
+  // Close the notifications popover if clicking outside
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handleOutsideClick = (e) => {
+      const container = document.querySelector('.notifications-container-wrapper');
+      if (container && !container.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showNotifications]);
 
   const handleMockLogin = (userData) => {
     setIsLoggingIn(true);
@@ -602,6 +737,8 @@ function App() {
     setCurrentUser(null);
     localStorage.removeItem('aura_current_user');
     setShowProfile(false);
+    setNotifications([]);
+    setShowNotifications(false);
   };
 
   const handleLogoClick = () => {
@@ -989,7 +1126,74 @@ function App() {
                 <span>Compare ({comparisonList.length})</span>
               </button>
             )}
-            <button className="icon-button"><Bell size={20} /></button>
+            <div className="notifications-container-wrapper">
+              <button 
+                className={`icon-button bell-button ${showNotifications ? 'active' : ''}`}
+                onClick={() => setShowNotifications(!showNotifications)}
+                id="bell-notification-btn"
+                aria-label="Toggle notifications popover"
+              >
+                <Bell size={20} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="notification-badge">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="notifications-popover glass-card animate-fade-in" id="notifications-popover-panel">
+                  <div className="notifications-popover-header">
+                    <h4>Notifications</h4>
+                    <div className="notifications-header-actions">
+                      {notifications.length > 0 && (
+                        <>
+                          <button onClick={markAllAsRead} className="text-action-btn">Mark all read</button>
+                          <span className="dot-separator"></span>
+                          <button onClick={clearAllNotifications} className="text-action-btn">Clear all</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="notifications-popover-body">
+                    {notifications.length === 0 ? (
+                      <div className="notifications-empty-state animate-fade-in">
+                        <Bell size={32} className="empty-bell-icon" />
+                        <p>No notifications yet</p>
+                      </div>
+                    ) : (
+                      <div className="notifications-list">
+                        {notifications.map(n => (
+                          <div 
+                            key={n.id} 
+                            className={`notification-item ${n.read ? 'read' : 'unread'} type-${n.type}`}
+                            onClick={() => markAsRead(n.id)}
+                          >
+                            <div className="notification-icon-wrapper">
+                              <span className="notification-status-dot"></span>
+                            </div>
+                            <div className="notification-item-content">
+                              <div className="notification-item-header">
+                                <span className="notification-title">{n.title}</span>
+                                <span className="notification-time">{n.timestamp}</span>
+                              </div>
+                              <p className="notification-message">{n.message}</p>
+                            </div>
+                            <button 
+                              className="notification-delete-btn"
+                              onClick={(e) => deleteNotification(n.id, e)}
+                              aria-label="Delete notification"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="divider"></div>
             <button className="primary-button" onClick={handleNewAnalysis}>New Analysis</button>
           </div>
@@ -1000,6 +1204,7 @@ function App() {
             <LibraryView 
               libraryItems={libraryItems} 
               setLibraryItems={setLibraryItems} 
+              addNotification={addNotification}
             />
           )}
           {activeView === 'trials' && <TrialsView />}
@@ -1012,7 +1217,7 @@ function App() {
             />
           )}
           {activeView === 'contact' && (
-            <ContactView />
+            <ContactView addNotification={addNotification} />
           )}
           
           {activeView === 'dashboard' && (
@@ -1595,7 +1800,7 @@ function InsightItem({ title, desc, time, onClick }) {
 }
 
 export default App;
-function LibraryView({ libraryItems, setLibraryItems }) {
+function LibraryView({ libraryItems, setLibraryItems, addNotification }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newId, setNewId] = useState('');
@@ -1612,6 +1817,13 @@ function LibraryView({ libraryItems, setLibraryItems }) {
       status: newStatus
     };
     setLibraryItems([...libraryItems, newItem]);
+    if (addNotification) {
+      addNotification(
+        'Target Added to Library',
+        `${newItem.name} (${newItem.id}) has been added to your Molecular Library.`,
+        'success'
+      );
+    }
     setNewName('');
     setNewId('');
     setNewType('Drug');
@@ -1632,7 +1844,16 @@ function LibraryView({ libraryItems, setLibraryItems }) {
           <div key={item.id} className="glass-card library-card">
             <button 
               className="remove-btn"
-              onClick={() => setLibraryItems(libraryItems.filter(i => i.id !== item.id))}
+              onClick={() => {
+                setLibraryItems(libraryItems.filter(i => i.id !== item.id));
+                if (addNotification) {
+                  addNotification(
+                    'Target Removed',
+                    `${item.name} has been removed from your Molecular Library.`,
+                    'info'
+                  );
+                }
+              }}
               style={{ pointerEvents: 'auto' }}
             >
               ×
@@ -1841,7 +2062,7 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
   );
 }
 
-function ContactView() {
+function ContactView({ addNotification }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('general');
@@ -1921,6 +2142,13 @@ function ContactView() {
 
       if (response.ok && result.status === 'success') {
         setStatus('success');
+        if (addNotification) {
+          addNotification(
+            'Message Transmitted Successfully',
+            `Support ticket for '${subject || category.toUpperCase()}' has been opened. We will respond within 24 hours.`,
+            'success'
+          );
+        }
         setName('');
         setEmail('');
         setSubject('');
