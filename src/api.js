@@ -75,13 +75,52 @@ export const fetchRecentTrials = async (pageSize = 50) => {
       status: s.protocolSection?.statusModule?.overallStatus || 'Unknown',
       phase: s.protocolSection?.designModule?.phases?.[0] || 'N/A',
       sponsor: s.protocolSection?.sponsorCollaboratorsModule?.leadSponsor?.name || 'Unknown Sponsor',
-      lastUpdate: s.protocolSection?.statusModule?.lastUpdateSubmitDate || null
+      lastUpdate: s.protocolSection?.statusModule?.lastUpdateSubmitDate || null,
+      country: s.protocolSection?.contactsLocationsModule?.locations?.[0]?.country || 'Unknown'
     }));
   } catch (error) {
     console.error('Failed to fetch trials:', error);
     return [];
   }
 };
+
+export const fetchLiveDatabaseStats = async () => {
+  try {
+    const [trialsRes, moleculesRes] = await Promise.all([
+      fetch(`${CLINICAL_TRIALS_BASE}?filter.overallStatus=RECRUITING&countTotal=true&pageSize=1`),
+      fetch(`${CHEMBL_BASE}/molecule.json?limit=1&format=json`)
+    ]);
+    
+    let trialsCount = 65239;
+    let moleculesCount = 2878135;
+    
+    if (trialsRes.ok) {
+      const data = await trialsRes.json();
+      if (data.totalCount !== undefined) {
+        trialsCount = data.totalCount;
+      }
+    }
+    
+    if (moleculesRes.ok) {
+      const data = await moleculesRes.json();
+      if (data.page_meta && data.page_meta.total_count !== undefined) {
+        moleculesCount = data.page_meta.total_count;
+      }
+    }
+    
+    return {
+      trials: trialsCount,
+      molecules: moleculesCount
+    };
+  } catch (error) {
+    console.error('Failed to fetch live database stats:', error);
+    return {
+      trials: 65239,
+      molecules: 2878135
+    };
+  }
+};
+
 
 // Helper for fallback deterministic metrics
 export const getFallbackMetrics = (item) => {
