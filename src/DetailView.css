@@ -169,3 +169,559 @@
   }
 }
 
+
+/* Premium Sub-tabs Selector */
+.detail-tabs-selector {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.detail-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.detail-tab-btn:hover {
+  color: var(--text-main);
+  background: var(--overlay-light);
+}
+
+.detail-tab-btn.active {
+  color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.1);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
+}
+
+/* Pathways & STRING Network Layout */
+.protein-pathways-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  height: 400px;
+}
+
+.pathways-map-card {
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+}
+
+.pathways-list-card {
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pathways-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.pathways-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+.pathways-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.pathway-item-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.pathway-item-link:hover {
+  background: var(--overlay-medium);
+  border-color: var(--accent-primary);
+  transform: translateX(2px);
+}
+
+.pathway-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.pathway-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pathway-id {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-muted);
+}
+
+/* FDA Safety Dashboard Styles */
+.fda-safety-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.fda-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.fda-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.fda-stat-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.fda-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.fda-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.severity-hosp {
+  color: #f59e0b;
+}
+
+.severity-death {
+  color: #ef4444;
+}
+
+.fda-charts-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+
+.fda-chart-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fda-chart-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: left;
+}
+
+.reactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reaction-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reaction-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.reaction-term {
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.reaction-count {
+  color: var(--text-muted);
+}
+
+.reaction-track {
+  height: 6px;
+  background: var(--overlay-light);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.reaction-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 3px;
+}
+
+.demographics-split {
+  display: flex;
+  justify-content: space-around;
+  margin: 10px 0;
+}
+
+.gender-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.gender-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gender-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.male .gender-value {
+  color: #06b6d4;
+}
+
+.female .gender-value {
+  color: #ec4899;
+}
+
+.gender-track {
+  height: 8px;
+  background: var(--overlay-light);
+  border-radius: 4px;
+  display: flex;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.gender-bar {
+  height: 100%;
+}
+
+.male-bar {
+  background: #06b6d4;
+}
+
+.female-bar {
+  background: #ec4899;
+}
+
+/* PubChem Cheminformatics Styles */
+.cheminformatics-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pubchem-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.chem-data-row {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+
+.lipinski-card {
+  padding: 24px;
+  text-align: left;
+}
+
+.lipinski-card h3, .structure-card h3, .smiles-sandbox-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.lipinski-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.lipinski-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.lipinski-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lipinski-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.lipinski-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+  text-transform: uppercase;
+}
+
+.lipinski-badge.pass {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.lipinski-badge.fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.structure-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chem-svg-container {
+  flex: 1;
+  min-height: 160px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.dark-theme .chem-svg-container {
+  background: rgba(255, 255, 255, 0.95); /* Keep chemical SVGs highly readable */
+}
+
+.chem-svg-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.svg-fallback-text {
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* SMILES Sandbox Styles */
+.smiles-sandbox-card {
+  padding: 24px;
+  text-align: left;
+}
+
+.sandbox-workspace {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.sandbox-input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sandbox-textarea {
+  width: 100%;
+  height: 100px;
+  padding: 12px;
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-main);
+  font-family: monospace;
+  font-size: 13px;
+  resize: none;
+}
+
+.presets-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+  background: var(--overlay-medium);
+  border-color: var(--accent-primary);
+}
+
+.sandbox-preview-panel {
+  background: var(--overlay-medium);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.sandbox-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sandbox-result {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sandbox-svg-container {
+  width: 100%;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.sandbox-svg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.sandbox-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.prop-badge-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.prop-badge-row span {
+  flex: 1;
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.prop-badge-row span strong {
+  color: var(--text-main);
+}
+
+.sandbox-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1024px) {
+  .protein-pathways-layout,
+  .fda-charts-grid,
+  .chem-data-row,
+  .sandbox-workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  
+  .fda-stats-row {
+    grid-template-columns: 1fr;
+  }
+}

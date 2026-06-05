@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download } from 'lucide-react';
-import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats } from './api';
+import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
 import Protein3DViewer from './Protein3DViewer';
@@ -191,6 +191,32 @@ function App() {
   const [activeMetrics, setActiveMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
 
+  const [activeDetailTab, setActiveDetailTab] = useState('affinity');
+  const [fdaSafetyData, setFdaSafetyData] = useState(null);
+  const [fdaLoading, setFdaLoading] = useState(false);
+  const [pubChemData, setPubChemData] = useState(null);
+  const [pubChemLoading, setPubChemLoading] = useState(false);
+  const [reactomePathways, setReactomePathways] = useState([]);
+  const [reactomeLoading, setReactomeLoading] = useState(false);
+  const [sandboxSmiles, setSandboxSmiles] = useState('');
+  const [sandboxData, setSandboxData] = useState(null);
+  const [sandboxLoading, setSandboxLoading] = useState(false);
+
+  // Reset tab selection when selectedItem changes
+  useEffect(() => {
+    if (selectedItem) {
+      const isProtein = selectedItem.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(selectedItem.id);
+      Promise.resolve().then(() => {
+        setActiveDetailTab(isProtein ? 'structure' : 'affinity');
+        setFdaSafetyData(null);
+        setPubChemData(null);
+        setReactomePathways([]);
+        setSandboxSmiles('');
+        setSandboxData(null);
+      });
+    }
+  }, [selectedItem]);
+
   // Fetch live metrics when selectedItem changes
   useEffect(() => {
     if (!selectedItem) {
@@ -227,6 +253,79 @@ function App() {
       active = false;
     };
   }, [selectedItem]);
+
+  // Fetch detailed tab metrics dynamically on selection / tab toggle
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const isProtein = selectedItem.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(selectedItem.id);
+    const drugName = selectedItem.name;
+
+    if (activeDetailTab === 'safety' && !isProtein && !fdaSafetyData) {
+      Promise.resolve().then(() => {
+        setFdaLoading(true);
+      });
+      fetchFDASafetyData(drugName).then(data => {
+        Promise.resolve().then(() => {
+          setFdaSafetyData(data);
+          setFdaLoading(false);
+        });
+      });
+    }
+
+    if (activeDetailTab === 'cheminformatics' && !isProtein && !pubChemData) {
+      Promise.resolve().then(() => {
+        setPubChemLoading(true);
+      });
+      fetchPubChemData(drugName).then(data => {
+        Promise.resolve().then(() => {
+          setPubChemData(data);
+          setSandboxSmiles(data.smiles);
+          setPubChemLoading(false);
+        });
+      });
+    }
+
+    if (activeDetailTab === 'pathways' && isProtein && reactomePathways.length === 0) {
+      Promise.resolve().then(() => {
+        setReactomeLoading(true);
+      });
+      fetchReactomePathways(selectedItem.id).then(data => {
+        Promise.resolve().then(() => {
+          setReactomePathways(data);
+          setReactomeLoading(false);
+        });
+      });
+    }
+  }, [selectedItem, activeDetailTab, fdaSafetyData, pubChemData, reactomePathways.length]);
+
+  // SMILES sandbox debounce property loader
+  useEffect(() => {
+    if (!sandboxSmiles) {
+      Promise.resolve().then(() => {
+        setSandboxData(null);
+      });
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      Promise.resolve().then(() => {
+        setSandboxLoading(true);
+      });
+      try {
+        const data = await fetchPubChemData(sandboxSmiles);
+        Promise.resolve().then(() => {
+          setSandboxData(data);
+          setSandboxLoading(false);
+        });
+      } catch (err) {
+        console.error("SMILES sandbox error:", err);
+        Promise.resolve().then(() => {
+          setSandboxLoading(false);
+        });
+      }
+    }, 600);
+    return () => clearTimeout(delayDebounceFn);
+  }, [sandboxSmiles]);
 
   const [comparisonList, setComparisonList] = useState([]);
   const [showComparison, setShowComparison] = useState(false);
@@ -1620,61 +1719,368 @@ function App() {
                         } <ExternalLink size={14} />
                       </a>
                     </div>
+
+                    {/* Premium Detail Tabs Selector */}
+                    <div className="detail-tabs-selector">
+                      {selectedItem.type === 'Protein' ? (
+                        <>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'structure' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('structure')}
+                          >
+                            3D Structure View
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'pathways' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('pathways')}
+                          >
+                            Pathways & Live Interactions
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'affinity' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('affinity')}
+                          >
+                            Molecular Binding Simulation
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'safety' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('safety')}
+                          >
+                            FDA Safety & Side Effects
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'cheminformatics' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('cheminformatics')}
+                          >
+                            Cheminformatics & SMILES
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </header>
                   
                   <div className="detail-content">
-                    <div className="detail-info-grid">
-                      <div className="info-block">
-                        <label>Primary Description</label>
-                        <p>{selectedItem.details}</p>
-                      </div>
-                      <div className="info-block">
-                        <label>Status</label>
-                        <p className="status-active">{selectedItem.status || 'Verified Integration'}</p>
-                      </div>
-                    </div>
+                    {/* Tab 1 (Protein): 3D Structure View */}
+                    {selectedItem.type === 'Protein' && activeDetailTab === 'structure' && (
+                      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="detail-info-grid">
+                          <div className="info-block">
+                            <label>Primary Description</label>
+                            <p>{selectedItem.details}</p>
+                          </div>
+                          <div className="info-block">
+                            <label>Status</label>
+                            <p className="status-active">{selectedItem.status || 'Verified Integration'}</p>
+                          </div>
+                        </div>
 
-                    <div className="bioactivity-grid">
-                      {metricsLoading ? (
-                        <>
-                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
-                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
-                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                        <div className="bioactivity-grid">
+                          {metricsLoading ? (
+                            <>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label1}</span><span className="bio-value">{metrics.value1}</span></div>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label2}</span><span className="bio-value">{metrics.value2}</span></div>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label3}</span><span className="bio-value">{metrics.value3}</span></div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="detail-visualizer glass-card">
+                          <Protein3DViewer key={selectedItem.id} uniprotId={selectedItem.id} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 2 (Protein): Pathways & Interactions */}
+                    {selectedItem.type === 'Protein' && activeDetailTab === 'pathways' && (
+                      <div className="protein-pathways-layout animate-fade-in">
+                        <div className="pathways-map-card glass-card">
+                          <InteractionMap uniprotId={selectedItem.id} />
+                        </div>
+                        <div className="pathways-list-card glass-card">
+                          <h3>Biological Pathways</h3>
+                          <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>Live Reactome Content Integration</p>
+                          {reactomeLoading ? (
+                            <div className="pathways-loader">
+                              <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                              <p>Retrieving biological pathways...</p>
+                            </div>
+                          ) : (
+                            <div className="pathways-list">
+                              {reactomePathways && reactomePathways.length > 0 ? (
+                                reactomePathways.map((path) => (
+                                  <a 
+                                    key={path.id} 
+                                    href={path.url} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="pathway-item-link"
+                                  >
+                                    <div className="pathway-info">
+                                      <span className="pathway-name">{path.name}</span>
+                                      <span className="pathway-id">{path.id}</span>
+                                    </div>
+                                    <ExternalLink size={14} />
+                                  </a>
+                                ))
+                              ) : (
+                                <div className="pathways-empty">No biological pathways found.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 1 (Drug): Binding Affinity */}
+                    {selectedItem.type !== 'Protein' && activeDetailTab === 'affinity' && (
+                      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="detail-info-grid">
+                          <div className="info-block">
+                            <label>Primary Description</label>
+                            <p>{selectedItem.details}</p>
                           </div>
-                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
-                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
-                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                          <div className="info-block">
+                            <label>Status</label>
+                            <p className="status-active">{selectedItem.status || 'Verified Integration'}</p>
                           </div>
-                          <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}>
-                            <span style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span>
-                            <span style={{ display: 'inline-block', width: '80px', height: '20px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', marginTop: '8px' }}></span>
+                        </div>
+
+                        <div className="bioactivity-grid">
+                          {metricsLoading ? (
+                            <>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                              <div className="bio-stat animate-pulse" style={{ opacity: 0.6 }}><span className="loading-shimmer-span" style={{ display: 'inline-block', width: '60px', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}></span></div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label1}</span><span className="bio-value">{metrics.value1}</span></div>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label2}</span><span className="bio-value">{metrics.value2}</span></div>
+                              <div className="bio-stat"><span className="bio-label">{metrics.label3}</span><span className="bio-value">{metrics.value3}</span></div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="detail-visualizer glass-card">
+                          <BindingVisualizer />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 2 (Drug): FDA Safety & Side Effects */}
+                    {selectedItem.type !== 'Protein' && activeDetailTab === 'safety' && (
+                      <div className="fda-safety-layout animate-fade-in">
+                        {fdaLoading ? (
+                          <div className="fda-loader">
+                            <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-primary)' }} />
+                            <p>Loading FDA Adverse Event database logs...</p>
                           </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="bio-stat">
-                            <span className="bio-label">{metrics.label1 || 'IC50'}</span>
-                            <span className="bio-value">{metrics.value1}</span>
+                        ) : (
+                          fdaSafetyData && (
+                            <>
+                              <div className="fda-stats-row">
+                                <div className="fda-stat-card glass-card">
+                                  <span className="fda-label">Total Adverse Reports</span>
+                                  <span className="fda-value">{fdaSafetyData.total.toLocaleString()}</span>
+                                </div>
+                                <div className="fda-stat-card glass-card">
+                                  <span className="fda-label">Hospitalizations</span>
+                                  <span className="fda-value severity-hosp">{fdaSafetyData.hospitalization.toLocaleString()}</span>
+                                </div>
+                                <div className="fda-stat-card glass-card">
+                                  <span className="fda-label">Fatal Outcomes</span>
+                                  <span className="fda-value severity-death">{fdaSafetyData.death.toLocaleString()}</span>
+                                </div>
+                              </div>
+
+                              <div className="fda-charts-grid">
+                                <div className="fda-chart-card glass-card">
+                                  <h3>Top Patient Reactions</h3>
+                                  <div className="reactions-list">
+                                    {fdaSafetyData.reactions.map((react, i) => {
+                                      const maxVal = fdaSafetyData.reactions[0]?.count || 1;
+                                      const pctWidth = Math.round((react.count / maxVal) * 100);
+                                      return (
+                                        <div key={i} className="reaction-row">
+                                          <div className="reaction-meta">
+                                            <span className="reaction-term">{react.term}</span>
+                                            <span className="reaction-count">{react.count.toLocaleString()} cases</span>
+                                          </div>
+                                          <div className="reaction-track">
+                                            <div className="reaction-bar" style={{ width: `${pctWidth}%` }}></div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="fda-chart-card glass-card demographics-card">
+                                  <h3>Patient Gender Distribution</h3>
+                                  <div className="demographics-split">
+                                    <div className="gender-metric male">
+                                      <span className="gender-label">Male</span>
+                                      <span className="gender-value">{fdaSafetyData.gender.male}%</span>
+                                    </div>
+                                    <div className="gender-metric female">
+                                      <span className="gender-label">Female</span>
+                                      <span className="gender-value">{fdaSafetyData.gender.female}%</span>
+                                    </div>
+                                  </div>
+                                  <div className="gender-track">
+                                    <div className="gender-bar male-bar" style={{ width: `${fdaSafetyData.gender.male}%` }}></div>
+                                    <div className="gender-bar female-bar" style={{ width: `${fdaSafetyData.gender.female}%` }}></div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 3 (Drug): Cheminformatics & SMILES Sandbox */}
+                    {selectedItem.type !== 'Protein' && activeDetailTab === 'cheminformatics' && (
+                      <div className="cheminformatics-layout animate-fade-in">
+                        {pubChemLoading ? (
+                          <div className="pubchem-loader">
+                            <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-primary)' }} />
+                            <p>Connecting to PubChem Compound Catalog...</p>
                           </div>
-                          <div className="bio-stat">
-                            <span className="bio-label">{metrics.label2 || 'Ki'}</span>
-                            <span className="bio-value">{metrics.value2}</span>
-                          </div>
-                          <div className="bio-stat">
-                            <span className="bio-label">{metrics.label3 || 'Efficiency'}</span>
-                            <span className="bio-value">{metrics.value3}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    
-                    <div className="detail-visualizer glass-card">
-                      {selectedItem.type === 'Protein' ? (
-                        <Protein3DViewer key={selectedItem.id} uniprotId={selectedItem.id} />
-                      ) : (
-                        <BindingVisualizer />
-                      )}
-                    </div>
+                        ) : (
+                          pubChemData && (
+                            <>
+                              <div className="chem-data-row">
+                                <div className="lipinski-card glass-card">
+                                  <h3>Lipinski's Rule of Five</h3>
+                                  <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>Drug-likeness compliance profiling</p>
+                                  
+                                  <div className="lipinski-grid">
+                                    <div className="lipinski-item">
+                                      <span className="lipinski-label">Molecular Weight</span>
+                                      <span className="lipinski-value">{pubChemData.weight.toFixed(1)} Da</span>
+                                      <span className={`lipinski-badge ${pubChemData.weight <= 500 ? 'pass' : 'fail'}`}>
+                                        {pubChemData.weight <= 500 ? 'Pass (<= 500)' : 'Fail'}
+                                      </span>
+                                    </div>
+                                    <div className="lipinski-item">
+                                      <span className="lipinski-label">LogP (Octanol/Water)</span>
+                                      <span className="lipinski-value">{pubChemData.logP !== null ? pubChemData.logP.toFixed(2) : 'N/A'}</span>
+                                      <span className={`lipinski-badge ${pubChemData.logP === null || pubChemData.logP <= 5 ? 'pass' : 'fail'}`}>
+                                        {pubChemData.logP === null || pubChemData.logP <= 5 ? 'Pass (<= 5.0)' : 'Fail'}
+                                      </span>
+                                    </div>
+                                    <div className="lipinski-item">
+                                      <span className="lipinski-label">H-Bond Donors</span>
+                                      <span className="lipinski-value">{pubChemData.donors}</span>
+                                      <span className={`lipinski-badge ${pubChemData.donors <= 5 ? 'pass' : 'fail'}`}>
+                                        {pubChemData.donors <= 5 ? 'Pass (<= 5)' : 'Fail'}
+                                      </span>
+                                    </div>
+                                    <div className="lipinski-item">
+                                      <span className="lipinski-label">H-Bond Acceptors</span>
+                                      <span className="lipinski-value">{pubChemData.acceptors}</span>
+                                      <span className={`lipinski-badge ${pubChemData.acceptors <= 10 ? 'pass' : 'fail'}`}>
+                                        {pubChemData.acceptors <= 10 ? 'Pass (<= 10)' : 'Fail'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="structure-card glass-card">
+                                  <h3>2D Chemical Structure</h3>
+                                  <div className="chem-svg-container">
+                                    <img 
+                                      src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(pubChemData.smiles)}/record/SVG`} 
+                                      alt="Molecular representation"
+                                      className="chem-svg-image"
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                    <div className="svg-fallback-text" style={{ display: 'none' }}>
+                                      <span>Structure unavailable</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="smiles-sandbox-card glass-card">
+                                <h3>SMILES Depiction Sandbox</h3>
+                                <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>Input a molecular SMILES descriptor to dynamically generate structures and properties</p>
+                                
+                                <div className="sandbox-workspace">
+                                  <div className="sandbox-input-panel">
+                                    <textarea 
+                                      className="sandbox-textarea glass-card"
+                                      value={sandboxSmiles}
+                                      onChange={(e) => setSandboxSmiles(e.target.value)}
+                                      placeholder="Paste SMILES (e.g. C1=CC=C(C=C1)C=O)..."
+                                    />
+                                    <div className="presets-row">
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Examples:</span>
+                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('CC(=O)Oc1ccccc1C(=O)O')}>Aspirin</button>
+                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('Cc1ccc(cc1)C(=O)Nc2ccc(cc2)CN3CCN(CC3)C')}>Imatinib</button>
+                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')}>Caffeine</button>
+                                    </div>
+                                  </div>
+
+                                  <div className="sandbox-preview-panel glass-card">
+                                    {sandboxLoading ? (
+                                      <div className="sandbox-loader">
+                                        <Loader2 className="animate-spin" size={20} />
+                                        <span>Resolving SMILES structure...</span>
+                                      </div>
+                                    ) : sandboxData ? (
+                                      <div className="sandbox-result animate-fade-in">
+                                        <div className="sandbox-svg-container">
+                                          <img 
+                                            src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(sandboxSmiles)}/record/SVG`} 
+                                            alt="SMILES structure representation"
+                                            className="sandbox-svg"
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                          <div className="sandbox-error-text" style={{ display: 'none' }}>
+                                            <span>Invalid SMILES Structure</span>
+                                          </div>
+                                        </div>
+                                        <div className="sandbox-properties">
+                                          <div className="prop-badge-row">
+                                            <span>Weight: <strong>{sandboxData.weight.toFixed(1)} Da</strong></span>
+                                            <span>LogP: <strong>{sandboxData.logP !== null ? sandboxData.logP.toFixed(2) : 'N/A'}</strong></span>
+                                          </div>
+                                          <div className="prop-badge-row">
+                                            <span>Donors: <strong>{sandboxData.donors}</strong></span>
+                                            <span>Acceptors: <strong>{sandboxData.acceptors}</strong></span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="sandbox-empty">
+                                        <span>Enter a valid molecular formula above</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
