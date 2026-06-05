@@ -2965,7 +2965,12 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
   const [statuses, setStatuses] = useState({
     chembl: 'checking',
     uniprot: 'checking',
-    clinicaltrials: 'checking'
+    clinicaltrials: 'checking',
+    europepmc: 'checking',
+    ensembl: 'checking',
+    gtex: 'checking',
+    gwas: 'checking',
+    rcsbpdb: 'checking'
   });
 
   useEffect(() => {
@@ -3001,14 +3006,66 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
       }
     };
 
+    const checkEuropePMC = async () => {
+      try {
+        const res = await fetch('https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=BRCA1&format=json&pageSize=1');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkEnsembl = async () => {
+      try {
+        const res = await fetch('https://rest.ensembl.org/info/ping?content-type=application/json');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkGTEx = async () => {
+      try {
+        const res = await fetch('https://gtexportal.org/api/v2/expression/medianGeneExpression?gencodeId=ENSG00000139618&datasetId=gtex_v8');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkGWAS = async () => {
+      try {
+        const res = await fetch('https://www.ebi.ac.uk/gwas/rest/api/studies?size=1');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
+    const checkRcsbPDB = async () => {
+      try {
+        const res = await fetch('https://data.rcsb.org/rest/v1/core/entry/1JNX');
+        return res.ok ? 'online' : 'offline';
+      } catch {
+        return 'offline';
+      }
+    };
+
     const checkAll = async () => {
-      const [chembl, uniprot, clinicaltrials] = await Promise.all([
+      const [chembl, uniprot, clinicaltrials, europepmc, ensembl, gtex, gwas, rcsbpdb] = await Promise.all([
         checkChEMBL(),
         checkUniProt(),
-        checkClinicalTrials()
+        checkClinicalTrials(),
+        checkEuropePMC(),
+        checkEnsembl(),
+        checkGTEx(),
+        checkGWAS(),
+        checkRcsbPDB()
       ]);
       if (active) {
-        setStatuses({ chembl, uniprot, clinicaltrials });
+        Promise.resolve().then(() => {
+          setStatuses({ chembl, uniprot, clinicaltrials, europepmc, ensembl, gtex, gwas, rcsbpdb });
+        });
       }
     };
 
@@ -3068,6 +3125,11 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
           <div className="source-item"><span>ChEMBL API</span> {renderStatus(statuses.chembl)}</div>
           <div className="source-item"><span>UniProt REST</span> {renderStatus(statuses.uniprot)}</div>
           <div className="source-item"><span>ClinicalTrials.gov</span> {renderStatus(statuses.clinicaltrials)}</div>
+          <div className="source-item"><span>Europe PMC (Lit)</span> {renderStatus(statuses.europepmc)}</div>
+          <div className="source-item"><span>Ensembl Genomics</span> {renderStatus(statuses.ensembl)}</div>
+          <div className="source-item"><span>GTEx Portal (Expression)</span> {renderStatus(statuses.gtex)}</div>
+          <div className="source-item"><span>GWAS Catalog (ClinVar)</span> {renderStatus(statuses.gwas)}</div>
+          <div className="source-item"><span>RCSB PDB (Structures)</span> {renderStatus(statuses.rcsbpdb)}</div>
         </div>
       </div>
     </div>
