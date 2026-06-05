@@ -908,19 +908,35 @@ function App() {
           setPendingAnalyses(parsed.pendingAnalyses);
           prevAnalysesRef.current = parsed.pendingAnalyses;
         }
-        if (parsed.notifications !== undefined) {
-          setNotifications(parsed.notifications);
-        } else {
-          const welcomeMsg = {
+        let loadedNotifications = parsed.notifications || [];
+        if (loadedNotifications.length === 0) {
+          loadedNotifications.push({
             id: `welcome-${Date.now()}`,
             title: 'Welcome to AURA!',
             message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
             type: 'welcome',
             read: false,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
-          };
-          setNotifications([welcomeMsg]);
+          });
         }
+
+        const hasUpgradeNotif = loadedNotifications.some(n => n.id === 'system-upgrade-v2');
+        if (!hasUpgradeNotif) {
+          const upgradeNotif = {
+            id: 'system-upgrade-v2',
+            title: 'System Upgrade: 5 New Data Feeds',
+            message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
+            type: 'info',
+            read: false,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+          };
+          loadedNotifications = [upgradeNotif, ...loadedNotifications];
+          localStorage.setItem(userKey, JSON.stringify({
+            ...parsed,
+            notifications: loadedNotifications
+          }));
+        }
+        setNotifications(loadedNotifications);
       } else {
         const defaultLibrary = [
           { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
@@ -935,10 +951,19 @@ function App() {
           read: false,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
         };
+        const upgradeNotif = {
+          id: 'system-upgrade-v2',
+          title: 'System Upgrade: 5 New Data Feeds',
+          message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
+          type: 'info',
+          read: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+        };
+        const initialNotifications = [upgradeNotif, welcomeMsg];
         setLibraryItems(defaultLibrary);
         setGlassmorphismIntensity(80);
         setDarkMode(true);
-        setNotifications([welcomeMsg]);
+        setNotifications(initialNotifications);
         prevAnalysesRef.current = INITIAL_PENDING_ANALYSES;
         
         localStorage.setItem(userKey, JSON.stringify({
@@ -946,7 +971,7 @@ function App() {
           glassmorphismIntensity: 80,
           darkMode: true,
           pendingAnalyses: INITIAL_PENDING_ANALYSES,
-          notifications: [welcomeMsg]
+          notifications: initialNotifications
         }));
       }
     });
@@ -1027,20 +1052,51 @@ function App() {
           
           const userKey = `aura_user_data_${userData.email}`;
           const savedData = localStorage.getItem(userKey);
+          let loadedNotifications = [welcomeMsg];
+          let parsed = null;
           if (savedData) {
             try {
-              const parsed = JSON.parse(savedData);
+              parsed = JSON.parse(savedData);
               if (parsed.notifications && parsed.notifications.length > 0) {
-                setNotifications(parsed.notifications);
-              } else {
-                setNotifications([welcomeMsg]);
+                loadedNotifications = parsed.notifications;
               }
             } catch {
-              setNotifications([welcomeMsg]);
+              // ignore parse errors
             }
-          } else {
-            setNotifications([welcomeMsg]);
           }
+
+          const hasUpgradeNotif = loadedNotifications.some(n => n.id === 'system-upgrade-v2');
+          if (!hasUpgradeNotif) {
+            const upgradeNotif = {
+              id: 'system-upgrade-v2',
+              title: 'System Upgrade: 5 New Data Feeds',
+              message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
+              type: 'info',
+              read: false,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+            };
+            loadedNotifications = [upgradeNotif, ...loadedNotifications];
+            
+            try {
+              if (parsed) {
+                localStorage.setItem(userKey, JSON.stringify({
+                  ...parsed,
+                  notifications: loadedNotifications
+                }));
+              } else {
+                localStorage.setItem(userKey, JSON.stringify({
+                  libraryItems: [],
+                  glassmorphismIntensity: 80,
+                  darkMode: true,
+                  pendingAnalyses: [],
+                  notifications: loadedNotifications
+                }));
+              }
+            } catch {
+              // ignore localStorage write errors
+            }
+          }
+          setNotifications(loadedNotifications);
         }, 1000);
       } else {
         setIsLoggingIn(false);
