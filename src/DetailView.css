@@ -725,3 +725,41 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Additional live integration database styles */
+.publication-item-link {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.publication-item-link:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--accent-primary) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+
+.table-responsive th, .table-responsive td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table-responsive tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Beautiful live expression chart styles */
+.expression-chart-container > div:hover div > div {
+  filter: brightness(1.2);
+  box-shadow: 0 0 12px var(--accent-primary);
+}
+
+/* ClinVar & GWAS mutations lists */
+.variants-list > div {
+  transition: all 0.2s ease;
+}
+
+.variants-list > div:hover {
+  border-color: var(--accent-secondary) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  transform: translateX(4px);
+}
+

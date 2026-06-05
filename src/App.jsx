@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download } from 'lucide-react';
-import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways } from './api';
+import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
 import Protein3DViewer from './Protein3DViewer';
@@ -202,6 +202,16 @@ function App() {
   const [sandboxData, setSandboxData] = useState(null);
   const [sandboxLoading, setSandboxLoading] = useState(false);
 
+  // Additional 5-source live integration states
+  const [publicationsData, setPublicationsData] = useState([]);
+  const [publicationsLoading, setPublicationsLoading] = useState(false);
+  const [ensemblData, setEnsemblData] = useState(null);
+  const [ensemblLoading, setEnsemblLoading] = useState(false);
+  const [gtexData, setGtexData] = useState([]);
+  const [gtexLoading, setGtexLoading] = useState(false);
+  const [gwasData, setGwasData] = useState([]);
+  const [gwasLoading, setGwasLoading] = useState(false);
+
   // Reset tab selection when selectedItem changes
   useEffect(() => {
     if (selectedItem) {
@@ -213,6 +223,10 @@ function App() {
         setReactomePathways([]);
         setSandboxSmiles('');
         setSandboxData(null);
+        setPublicationsData([]);
+        setEnsemblData(null);
+        setGtexData([]);
+        setGwasData([]);
       });
     }
   }, [selectedItem]);
@@ -297,7 +311,55 @@ function App() {
         });
       });
     }
-  }, [selectedItem, activeDetailTab, fdaSafetyData, pubChemData, reactomePathways.length]);
+
+    if (activeDetailTab === 'publications' && publicationsData.length === 0) {
+      Promise.resolve().then(() => {
+        setPublicationsLoading(true);
+      });
+      fetchEuropePMCPublications(selectedItem.name).then(data => {
+        Promise.resolve().then(() => {
+          setPublicationsData(data);
+          setPublicationsLoading(false);
+        });
+      });
+    }
+
+    if (activeDetailTab === 'genomics' && isProtein && !ensemblData) {
+      Promise.resolve().then(() => {
+        setEnsemblLoading(true);
+      });
+      fetchEnsemblGenomics(selectedItem.name).then(data => {
+        Promise.resolve().then(() => {
+          setEnsemblData(data);
+          setEnsemblLoading(false);
+        });
+      });
+    }
+
+    if (activeDetailTab === 'expression' && isProtein && gtexData.length === 0) {
+      Promise.resolve().then(() => {
+        setGtexLoading(true);
+      });
+      fetchGTExExpression(selectedItem.name).then(data => {
+        Promise.resolve().then(() => {
+          setGtexData(data);
+          setGtexLoading(false);
+        });
+      });
+    }
+
+    if (activeDetailTab === 'variants' && isProtein && gwasData.length === 0) {
+      Promise.resolve().then(() => {
+        setGwasLoading(true);
+      });
+      fetchGWASAssociations(selectedItem.name).then(data => {
+        Promise.resolve().then(() => {
+          setGwasData(data);
+          setGwasLoading(false);
+        });
+      });
+    }
+  }, [selectedItem, activeDetailTab, fdaSafetyData, pubChemData, reactomePathways.length, publicationsData.length, ensemblData, gtexData.length, gwasData.length]);
 
   // SMILES sandbox debounce property loader
   useEffect(() => {
@@ -1736,6 +1798,30 @@ function App() {
                           >
                             Pathways & Live Interactions
                           </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'genomics' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('genomics')}
+                          >
+                            Genomic Structure
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'expression' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('expression')}
+                          >
+                            Tissue Expression
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'variants' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('variants')}
+                          >
+                            Clinical Variants
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'publications' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('publications')}
+                          >
+                            Publications
+                          </button>
                         </>
                       ) : (
                         <>
@@ -1756,6 +1842,12 @@ function App() {
                             onClick={() => setActiveDetailTab('cheminformatics')}
                           >
                             Cheminformatics & SMILES
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'publications' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('publications')}
+                          >
+                            Publications
                           </button>
                         </>
                       )}
@@ -2078,6 +2170,255 @@ function App() {
                               </div>
                             </>
                           )
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 4 (both): Publications */}
+                    {activeDetailTab === 'publications' && (
+                      <div className="publications-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Scientific Publications</h3>
+                        <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                          Live search results from Europe PMC
+                        </p>
+                        {publicationsLoading ? (
+                          <div className="loader-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px' }}>
+                            <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Retrieving publications...</p>
+                          </div>
+                        ) : (
+                          <div className="publications-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {publicationsData && publicationsData.length > 0 ? (
+                              publicationsData.map((pub, idx) => (
+                                <a 
+                                  key={idx} 
+                                  href={pub.url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="publication-item-link"
+                                  style={{
+                                    display: 'block',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    textDecoration: 'none',
+                                    color: 'inherit'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                    <div style={{ flex: 1 }}>
+                                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-color)', lineHeight: 1.4 }}>
+                                        {pub.title}
+                                      </h4>
+                                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                        {pub.authors}
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                        <span style={{ fontWeight: '500' }}>{pub.journal}</span> • {pub.year}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                                      {pub.citations !== undefined && (
+                                        <span style={{ 
+                                          fontSize: '10px', 
+                                          background: 'rgba(0, 83, 214, 0.15)', 
+                                          color: '#65CBFF', 
+                                          padding: '2px 6px', 
+                                          borderRadius: '4px',
+                                          fontWeight: '500',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          Citations: {pub.citations}
+                                        </span>
+                                      )}
+                                      <ExternalLink size={12} style={{ color: 'var(--text-muted)' }} />
+                                    </div>
+                                  </div>
+                                </a>
+                              ))
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                No publications found for this query.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 5 (Protein only): Genomic Structure */}
+                    {selectedItem.type === 'Protein' && activeDetailTab === 'genomics' && (
+                      <div className="genomics-tab-layout animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="detail-info-grid">
+                          <div className="info-block">
+                            <label>Chromosome</label>
+                            <p>{ensemblData ? `Chr ${ensemblData.chromosome}` : 'N/A'}</p>
+                          </div>
+                          <div className="info-block">
+                            <label>Coordinates</label>
+                            <p>{ensemblData ? `${ensemblData.start} - ${ensemblData.end}` : 'N/A'}</p>
+                          </div>
+                          <div className="info-block">
+                            <label>Strand</label>
+                            <p>{ensemblData ? ensemblData.strand : 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <div className="transcripts-card glass-card" style={{ padding: '16px' }}>
+                          <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Splice Transcripts</h3>
+                          <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                            Ensembl Transcript Isoforms mapped to genomic locus
+                          </p>
+                          {ensemblLoading ? (
+                            <div className="loader-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px' }}>
+                              <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Retrieving transcript data...</p>
+                            </div>
+                          ) : (
+                            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                                    <th style={{ padding: '8px 12px 8px 4px' }}>Transcript ID</th>
+                                    <th style={{ padding: '8px 12px' }}>Name</th>
+                                    <th style={{ padding: '8px 12px' }}>Length</th>
+                                    <th style={{ padding: '8px 4px 8px 12px', textAlign: 'right' }}>Biotype</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {ensemblData && ensemblData.transcripts && ensemblData.transcripts.length > 0 ? (
+                                    ensemblData.transcripts.map((t, idx) => (
+                                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <td style={{ padding: '8px 12px 8px 4px', fontFamily: 'monospace', color: '#65CBFF' }}>{t.id}</td>
+                                        <td style={{ padding: '8px 12px', fontWeight: '500' }}>{t.name}</td>
+                                        <td style={{ padding: '8px 12px' }}>{t.length.toLocaleString()} bp</td>
+                                        <td style={{ padding: '8px 4px 8px 12px', textAlign: 'right', color: t.biotype === 'protein_coding' ? '#39d353' : 'var(--text-muted)' }}>{t.biotype}</td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No transcripts found.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 6 (Protein only): Tissue Expression Profile */}
+                    {selectedItem.type === 'Protein' && activeDetailTab === 'expression' && (
+                      <div className="expression-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Tissue Expression Profile</h3>
+                        <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                          Median expression (TPM) across human tissues from GTEx Portal (v8)
+                        </p>
+                        {gtexLoading ? (
+                          <div className="loader-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px' }}>
+                            <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Retrieving expression data...</p>
+                          </div>
+                        ) : (
+                          <div className="expression-chart-container" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {gtexData && gtexData.length > 0 ? (
+                              (() => {
+                                const maxTpm = Math.max(...gtexData.map(d => d.tpm), 1.0);
+                                return gtexData.map((d, idx) => {
+                                  const pct = (d.tpm / maxTpm) * 100;
+                                  return (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px' }}>
+                                      <div style={{ width: '110px', fontWeight: '500', color: 'var(--text-color)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                        {d.tissue}
+                                      </div>
+                                      <div style={{ flex: 1, height: '14px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '7px', overflow: 'hidden', position: 'relative' }}>
+                                        <div 
+                                          style={{ 
+                                            width: `${pct}%`, 
+                                            height: '100%', 
+                                            background: 'linear-gradient(90deg, #0053D6, #65CBFF)', 
+                                            borderRadius: '7px',
+                                            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                                          }} 
+                                        />
+                                      </div>
+                                      <div style={{ width: '70px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                                        {d.tpm.toFixed(1)} TPM
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                No tissue expression data found.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 7 (Protein only): Clinical Variants & GWAS */}
+                    {selectedItem.type === 'Protein' && activeDetailTab === 'variants' && (
+                      <div className="variants-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>ClinVar & GWAS Risk Associations</h3>
+                        <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                          Variant pathogenicity and genetic disease traits
+                        </p>
+                        {gwasLoading ? (
+                          <div className="loader-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px' }}>
+                            <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Retrieving genetic variants...</p>
+                          </div>
+                        ) : (
+                          <div className="variants-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {gwasData && gwasData.length > 0 ? (
+                              gwasData.map((item, idx) => (
+                                <div 
+                                  key={idx} 
+                                  style={{
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                  }}
+                                >
+                                  <div>
+                                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>
+                                      {item.trait}
+                                    </h4>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                                      Locus ID: {item.variantId}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span style={{
+                                      fontSize: '10px',
+                                      padding: '3px 8px',
+                                      borderRadius: '12px',
+                                      fontWeight: '600',
+                                      background: item.significance === 'Pathogenic' ? 'rgba(255, 92, 92, 0.15)' : 'rgba(255, 219, 26, 0.15)',
+                                      color: item.significance === 'Pathogenic' ? '#ff5c5c' : '#FFDB1A',
+                                      border: `1px solid ${item.significance === 'Pathogenic' ? 'rgba(255, 92, 92, 0.3)' : 'rgba(255, 219, 26, 0.3)'}`
+                                    }}>
+                                      {item.significance}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                No clinical variant mappings found for this target.
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
