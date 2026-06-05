@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     }
 
     // 1. Verify reCAPTCHA token using siteverify API
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || '6Le7rfQsAAAAAEHdS47N-BYtPOkp7O9dPrw8AdiY';
+    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || '6LdyIQ8tAAAAAP1Cz8k4OW0-LD1o6fmKTggDG7-E';
     const siteverifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
 
     const recaptchaResponse = await fetch(siteverifyUrl, {
