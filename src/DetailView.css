@@ -763,3 +763,178 @@
   transform: translateX(4px);
 }
 
+@media print {
+  /* Force light background and dark text for print quality */
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* Hide navigation sidebar, top bars, buttons, and settings controls */
+  .sidebar,
+  .top-bar,
+  .section-header,
+  .stats-row,
+  .recent-insights,
+  .quick-actions,
+  .back-button,
+  .detail-actions,
+  .detail-tabs-selector,
+  .glassmorphism-controls,
+  .presets-row,
+  .sandbox-input-panel,
+  .search-filter-chips,
+  .search-shortcut,
+  .add-more-placeholder,
+  .comparison-drawer {
+    display: none !important;
+  }
+
+  /* Unconstrain structural layouts so details cover full print width */
+  .app-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+
+  .main-content {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+  }
+
+  .grid-layout {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .glass-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    margin-bottom: 20px !important;
+    padding: 15px !important;
+    page-break-inside: avoid;
+  }
+
+  .detail-view {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .detail-title-row {
+    margin-bottom: 20px !important;
+    border-bottom: 2px solid #000000 !important;
+    padding-bottom: 10px !important;
+  }
+
+  .detail-title-row h2 {
+    font-size: 22pt !important;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .badge {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 9pt !important;
+    padding: 2px 8px !important;
+    text-transform: uppercase;
+  }
+
+  .id-tag {
+    font-size: 11pt !important;
+    color: #475569 !important;
+    font-family: monospace;
+  }
+
+  /* Stack grid layouts to optimize portrait space */
+  .detail-info-grid,
+  .protein-pathways-layout,
+  .fda-charts-grid,
+  .chem-data-row,
+  .sandbox-workspace {
+    display: block !important;
+  }
+
+  .info-block {
+    margin-bottom: 12px !important;
+    page-break-inside: avoid;
+  }
+
+  .info-block label {
+    font-size: 9pt !important;
+    color: #475569 !important;
+    font-weight: bold !important;
+  }
+
+  /* Table styling for high contrast printing */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 10px !important;
+    margin-bottom: 15px !important;
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 10px !important;
+    text-align: left !important;
+    font-size: 9pt !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+    color: #0f172a !important;
+  }
+
+  /* Maintain layout visualizers and diagrams */
+  .detail-visualizer,
+  .chem-svg-container,
+  .sandbox-preview-panel {
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    page-break-inside: avoid;
+    max-height: 260px !important;
+    margin-top: 10px !important;
+  }
+
+  /* Force background colors on colored bars/charts */
+  .reaction-bar,
+  .gender-bar,
+  .progress-fill,
+  .expression-chart-container div {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

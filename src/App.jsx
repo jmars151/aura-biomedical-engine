@@ -195,6 +195,7 @@ function App() {
     pending: pendingAnalyses.length.toString() 
   };
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilter, setSearchFilter] = useState('all');
   const [highlightSearch, setHighlightSearch] = useState(false);
   const searchInputRef = useRef(null);
   const [results, setResults] = useState(null);
@@ -1557,10 +1558,38 @@ function App() {
               <div className="search-shortcut">⌘ K</div>
             </div>
 
+            {/* Filter chips */}
+            <div className="search-filter-chips" style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingLeft: '4px' }}>
+              {['all', 'proteins', 'drugs', 'trials'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setSearchFilter(filter)}
+                  className={`filter-chip ${searchFilter === filter ? 'active' : ''}`}
+                  style={{
+                    background: searchFilter === filter ? 'rgba(124, 58, 237, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid',
+                    borderColor: searchFilter === filter ? 'var(--accent-primary)' : 'var(--border-color)',
+                    color: searchFilter === filter ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    padding: '2px 10px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textTransform: 'capitalize',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
             {results && (
               <div className="search-results glass-card animate-fade-in">
-                {Object.entries(results).map(([type, items]) => (
-                  items.length > 0 && (
+                {Object.entries(results)
+                  .filter(([type]) => searchFilter === 'all' || type === searchFilter)
+                  .map(([type, items]) => (
+                    items.length > 0 && (
                     <div key={type} className="result-group">
                       <h5 className="result-group-title">{type.toUpperCase()}</h5>
                       {items.map((item) => (
@@ -1702,6 +1731,7 @@ function App() {
               setGlassmorphismIntensity={setGlassmorphismIntensity}
               darkMode={darkMode}
               setDarkMode={setDarkMode}
+              addNotification={addNotification}
             />
           )}
           {activeView === 'contact' && (
@@ -1834,20 +1864,42 @@ function App() {
                         <h2>{selectedItem.name}</h2>
                         <p className="id-tag">{selectedItem.id}</p>
                       </div>
-                      <a 
-                        href={selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
-                          ? `https://clinicaltrials.gov/study/${selectedItem.id}`
-                          : `https://google.com/search?q=${selectedItem.id}+${selectedItem.name}`
-                        } 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="external-link"
-                      >
-                        {selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
-                          ? 'View Clinical Trial'
-                          : 'Source Data'
-                        } <ExternalLink size={14} />
-                      </a>
+                      <div className="detail-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          onClick={() => window.print()}
+                          className="external-link"
+                          style={{ 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'rgba(124, 58, 237, 0.08)',
+                            border: '1px solid rgba(124, 58, 237, 0.15)',
+                            color: 'var(--text-main)',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            fontSize: '13px'
+                          }}
+                          title="Print or Save PDF report for this target profile"
+                        >
+                          <Download size={14} />
+                          <span>Export PDF Report</span>
+                        </button>
+                        <a 
+                          href={selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
+                            ? `https://clinicaltrials.gov/study/${selectedItem.id}`
+                            : `https://google.com/search?q=${selectedItem.id}+${selectedItem.name}`
+                          } 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="external-link"
+                        >
+                          {selectedItem.type === 'Clinical Trial' || selectedItem.type === 'Study' || (selectedItem.id && selectedItem.id.startsWith('NCT'))
+                            ? 'View Clinical Trial'
+                            : 'Source Data'
+                          } <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </div>
 
                     {/* Premium Detail Tabs Selector */}
@@ -3029,7 +3081,7 @@ function TrialsView() {
   );
 }
 
-function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkMode, setDarkMode }) {
+function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkMode, setDarkMode, addNotification }) {
   const [statuses, setStatuses] = useState({
     chembl: 'checking',
     uniprot: 'checking',
@@ -3040,6 +3092,8 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
     gwas: 'checking',
     rcsbpdb: 'checking'
   });
+
+  const notifiedOutagesRef = useRef(new Set());
 
   useEffect(() => {
     let active = true;
@@ -3133,6 +3187,34 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
       if (active) {
         Promise.resolve().then(() => {
           setStatuses({ chembl, uniprot, clinicaltrials, europepmc, ensembl, gtex, gwas, rcsbpdb });
+
+          const checks = [
+            { label: 'ChEMBL API', status: chembl, id: 'chembl' },
+            { label: 'UniProt REST', status: uniprot, id: 'uniprot' },
+            { label: 'ClinicalTrials.gov', status: clinicaltrials, id: 'clinicaltrials' },
+            { label: 'Europe PMC (Lit)', status: europepmc, id: 'europepmc' },
+            { label: 'Ensembl Genomics', status: ensembl, id: 'ensembl' },
+            { label: 'GTEx Portal (Expression)', status: gtex, id: 'gtex' },
+            { label: 'GWAS Catalog (ClinVar)', status: gwas, id: 'gwas' },
+            { label: 'RCSB PDB (Structures)', status: rcsbpdb, id: 'rcsbpdb' }
+          ];
+
+          checks.forEach(check => {
+            if (check.status === 'offline') {
+              if (!notifiedOutagesRef.current.has(check.id)) {
+                notifiedOutagesRef.current.add(check.id);
+                if (addNotification) {
+                  addNotification(
+                    `Data Source Offline: ${check.label}`,
+                    `${check.label} is currently unreachable. AURA has seamlessly enabled local seed fallbacks.`,
+                    'warning'
+                  );
+                }
+              }
+            } else if (check.status === 'online') {
+              notifiedOutagesRef.current.delete(check.id);
+            }
+          });
         });
       }
     };
@@ -3142,7 +3224,7 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
     return () => {
       active = false;
     };
-  }, []);
+  }, [addNotification]);
 
   const renderStatus = (status) => {
     if (status === 'online') {
