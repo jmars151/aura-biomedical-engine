@@ -160,6 +160,18 @@ function App() {
   });
 
   useEffect(() => {
+    // Log system upgrades to browser console
+    console.log(
+      `%c AURA Biomedical Engine - Live Upgrades Installed %c\n` +
+      `🧬 Ensembl: Genomic coordinates & transcripts\n` +
+      `📊 GTEx Portal: Tissue expression profiles\n` +
+      `📚 Europe PMC: Literature research queries\n` +
+      `🏥 GWAS Catalog: Clinical risk trait mappings\n` +
+      `💎 RCSB PDB: Resolved crystallographic structural models`,
+      `background: #7c3aed; color: #fff; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 6px;`,
+      `color: #bbf7d0; font-size: 11px; line-height: 1.6;`
+    );
+
     const loadStats = async () => {
       try {
         const stats = await fetchLiveDatabaseStats();
