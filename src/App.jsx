@@ -3462,6 +3462,12 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
                     • Google Error: {captchaLogs.recaptchaData['error-codes'].join(', ')}
                   </div>
                 )}
+                {captchaLogs.environmentVariables && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '6px', borderTop: '1px solid rgba(239, 68, 68, 0.15)', paddingTop: '6px' }}>
+                    <div>• Secret Key Env: {captchaLogs.environmentVariables.hasSecretKeyEnv ? 'Defined in Vercel' : 'Using Code Fallback'}</div>
+                    <div>• Active Secret Key: {captchaLogs.environmentVariables.secretKeyEndsWith}</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
