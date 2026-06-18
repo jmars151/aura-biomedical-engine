@@ -371,9 +371,9 @@ export const fetchPubChemData = async (drugName) => {
   try {
     let url;
     if (isSmiles) {
-      url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(cleanName)}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,CanonicalSMILES/JSON`;
+      url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(cleanName)}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,CanonicalSMILES,MolecularFormula/JSON`;
     } else {
-      url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,CanonicalSMILES/JSON`;
+      url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,CanonicalSMILES,MolecularFormula/JSON`;
     }
 
     const res = await fetch(url);
@@ -387,7 +387,8 @@ export const fetchPubChemData = async (drugName) => {
       logP: props.XLogP !== undefined ? parseFloat(props.XLogP) : null,
       donors: parseInt(props.HBondDonorCount) || 0,
       acceptors: parseInt(props.HBondAcceptorCount) || 0,
-      smiles: props.CanonicalSMILES || ''
+      smiles: props.CanonicalSMILES || '',
+      formula: props.MolecularFormula || ''
     };
   } catch (error) {
     console.warn(`[fetchPubChemData] Failed to fetch PubChem data for ${drugName}:`, error);
@@ -407,13 +408,16 @@ const getFallbackPubChemData = (drugName) => {
   const donors = hash % 5;
   const acceptors = 2 + (hash % 8);
   const smiles = 'CC(=O)Oc1ccccc1C(=O)O'; // Default aspirin smiles
+  const formulaOptions = ['C9H8O4', 'C8H9NO2', 'C22H29FN3O9P', 'C17H21NO4', 'C20H25N3O', 'C16H19N3O5S'];
+  const formula = formulaOptions[hash % formulaOptions.length];
 
   return {
     weight,
     logP,
     donors,
     acceptors,
-    smiles
+    smiles,
+    formula
   };
 };
 

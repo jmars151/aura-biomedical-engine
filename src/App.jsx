@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Shield, CheckCircle2, AlertTriangle, Play } from 'lucide-react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Clock, TrendingUp, Trash2 } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
@@ -85,8 +85,138 @@ const INITIAL_PENDING_ANALYSES = [
   { id: 'PA-014', title: 'ChEMBL bioactivity dataset synchronization', category: 'Data Sync', status: 'queued' },
   { id: 'PA-015', title: 'User interface telemetry and server logs audit', category: 'Telemetry', status: 'running' }
 ];
+const TRENDING_TARGETS = ['EGFR', 'BRCA1', 'Imatinib', 'NCT00868335', 'HER2', 'BRAF'];
+const PRESET_COMPOUNDS = [
+  { name: 'Aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O', formula: 'C9H8O4' },
+  { name: 'Imatinib', smiles: 'Cc1ccc(cc1)C(=O)Nc2ccc(cc2)CN3CCN(CC3)C', formula: 'C29H31N7O' },
+  { name: 'Caffeine', smiles: 'CN1C=NC2=C1C(=O)N(C(=O)N2C)C', formula: 'C8H10N4O2' },
+  { name: 'Acetaminophen', smiles: 'CC(=O)Nc1ccc(O)cc1', formula: 'C8H9NO2' },
+  { name: 'Ibuprofen', smiles: 'CC(C)Cc1ccc(cc1)C(C)C(=O)O', formula: 'C13H18O2' },
+  { name: 'Penicillin G', smiles: 'CC1(C(N2C(S1)C(C2=O)NC(=O)Cc3ccccc3)C(=O)O)C', formula: 'C16H18N2O4S' },
+  { name: 'Nicotine', smiles: 'CN1CCCC1c2cccnc2', formula: 'C10H14N2' },
+  { name: 'Atorvastatin', smiles: 'CC(C)c1c(C(=O)Nc2ccccc2)c(c(-c3ccc(F)cc3)n1CC[C@@H](O)C[C@@H](O)CC(=O)O)-c4ccccc4', formula: 'C33H35FN2O5' }
+];
 
+const downloadCSV = (filename, headers, rows) => {
+  const content = [
+    headers.join(','),
+    ...rows.map(row => row.map(val => {
+      const str = String(val === null || val === undefined ? '' : val).replace(/"/g, '""');
+      return str.includes(',') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+    }).join(','))
+  ].join('\n');
 
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const exportTranscriptsToCSV = (targetName, transcripts) => {
+  if (!transcripts || transcripts.length === 0) return;
+  const headers = ['Transcript ID', 'Name', 'Length (bp)', 'Biotype'];
+  const rows = transcripts.map(t => [t.id, t.name, t.length, t.biotype]);
+  downloadCSV(`${targetName}_transcripts.csv`, headers, rows);
+};
+
+const exportFDAReactionsToCSV = (drugName, reactions) => {
+  if (!reactions || reactions.length === 0) return;
+  const headers = ['Reaction Term', 'Reported Cases'];
+  const rows = reactions.map(r => [r.term, r.count]);
+  downloadCSV(`${drugName}_fda_reactions.csv`, headers, rows);
+};
+
+const exportTrialsToCSV = (trials) => {
+  if (!trials || trials.length === 0) return;
+  const headers = ['NCT ID', 'Brief Title', 'Status', 'Phase', 'Sponsor', 'Country'];
+  const rows = trials.map(t => [t.id, t.title, t.status, t.phase, t.sponsor, t.country]);
+  downloadCSV(`active_global_studies.csv`, headers, rows);
+};
+
+const parseFormula = (formula) => {
+  if (!formula) return [];
+  const elementRegex = /([A-Z][a-z]*)(\d*)/g;
+  const elements = {};
+  let match;
+  while ((match = elementRegex.exec(formula)) !== null) {
+    const element = match[1];
+    const count = parseInt(match[2] || '1', 10);
+    elements[element] = (elements[element] || 0) + count;
+  }
+  
+  const ATOMIC_MASSES = {
+    'H': 1.008, 'C': 12.011, 'N': 14.007, 'O': 15.999, 'F': 18.998,
+    'Na': 22.990, 'P': 30.974, 'S': 32.06, 'Cl': 35.45, 'K': 39.098,
+    'Br': 79.904, 'I': 126.904
+  };
+
+  const totalWeight = Object.entries(elements).reduce((sum, [el, count]) => {
+    return sum + (ATOMIC_MASSES[el] || 12.0) * count;
+  }, 0);
+
+  return Object.entries(elements).map(([el, count]) => {
+    const elMass = (ATOMIC_MASSES[el] || 12.0) * count;
+    const pct = totalWeight > 0 ? (elMass / totalWeight) * 100 : 0;
+    return { element: el, count, mass: elMass, percentage: pct };
+  }).sort((a, b) => b.mass - a.mass);
+};
+
+const renderCompositionChart = (formula) => {
+  const composition = parseFormula(formula);
+  if (composition.length === 0) return null;
+  
+  const ELEMENT_COLORS = {
+    'C': '#a855f7', 'H': '#3b82f6', 'N': '#06b6d4', 'O': '#ef4444',
+    'F': '#eab308', 'P': '#f97316', 'S': '#10b981', 'Cl': '#ec4899',
+    'Br': '#8b5cf6', 'I': '#6366f1', 'Na': '#14b8a6'
+  };
+  const getElementColor = (el) => ELEMENT_COLORS[el] || '#6b7280';
+  
+  return (
+    <div className="element-composition-chart" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>Elemental Mass Breakdown ({formula})</span>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sorted by mass %</span>
+      </div>
+      <div style={{
+        display: 'flex',
+        height: '16px',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-color)',
+        width: '100%'
+      }}>
+        {composition.map((item, idx) => (
+          <div
+            key={idx}
+            style={{
+              width: `${item.percentage}%`,
+              background: getElementColor(item.element),
+              height: '100%',
+              transition: 'all 0.3s ease'
+            }}
+            title={`${item.element}: ${item.count} atoms, ${item.percentage.toFixed(1)}% by mass`}
+          />
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '4px' }}>
+        {composition.map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: getElementColor(item.element) }} />
+            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.element}</span>
+            <span style={{ color: 'var(--text-muted)' }}>x{item.count} ({item.percentage.toFixed(1)}%)</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [pendingAnalyses, setPendingAnalyses] = useState(INITIAL_PENDING_ANALYSES);
@@ -224,6 +354,38 @@ function App() {
   const [gtexLoading, setGtexLoading] = useState(false);
   const [gwasData, setGwasData] = useState([]);
   const [gwasLoading, setGwasLoading] = useState(false);
+
+  // Search Autocomplete, CSV Exports, Map Highlighting, SMILES Sandbox Upgrades
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aura_recent_searches');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activeMapRegion, setActiveMapRegion] = useState(null);
+  const [sandboxSearchQuery, setSandboxSearchQuery] = useState('');
+  const [sandboxShowDropdown, setSandboxShowDropdown] = useState(false);
+
+  const addRecentSearch = (query) => {
+    if (!query || query.trim().length < 2) return;
+    const q = query.trim();
+    setRecentSearches(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== q.toLowerCase());
+      const next = [q, ...filtered].slice(0, 5);
+      localStorage.setItem('aura_recent_searches', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('aura_recent_searches');
+  };
+
+
 
   // Reset tab selection when selectedItem changes
   useEffect(() => {
@@ -1552,6 +1714,8 @@ function App() {
                 placeholder="Search molecular targets, drugs, or clinical trials..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                 ref={searchInputRef}
                 className="search-input"
               />
@@ -1599,6 +1763,7 @@ function App() {
                           onClick={() => {
                             setSelectedItem(item);
                             setResults(null);
+                            addRecentSearch(searchQuery || item.name);
                             setSearchQuery('');
                           }}
                         >
@@ -1625,6 +1790,97 @@ function App() {
                     </div>
                   )
                 ))}
+              </div>
+            )}
+
+            {isSearchFocused && searchQuery.length < 3 && (
+              <div className="search-suggestions glass-card animate-fade-in" style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '8px',
+                zIndex: 1000,
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                {recentSearches.length > 0 && (
+                  <div className="suggestion-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={12} style={{ color: 'var(--accent-primary)' }} /> Recent Searches
+                      </span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); clearRecentSearches(); }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px' }}
+                        title="Clear all recent searches"
+                      >
+                        <Trash2 size={10} /> Clear
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {recentSearches.map((term, idx) => (
+                        <div 
+                          key={idx}
+                          onClick={() => {
+                            setSearchQuery(term);
+                            searchInputRef.current?.focus();
+                          }}
+                          className="suggestion-tag"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'var(--overlay-light)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-main)',
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <span>{term}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="suggestion-section">
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <TrendingUp size={12} style={{ color: 'var(--accent-primary)' }} /> Trending Targets
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {TRENDING_TARGETS.map((term, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => {
+                          setSearchQuery(term);
+                          searchInputRef.current?.focus();
+                        }}
+                        className="suggestion-tag"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'var(--overlay-light)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-main)',
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <span>{term}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2116,7 +2372,31 @@ function App() {
 
                               <div className="fda-charts-grid">
                                 <div className="fda-chart-card glass-card">
-                                  <h3>Top Patient Reactions</h3>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                    <h3 style={{ margin: 0 }}>Top Patient Reactions</h3>
+                                    {fdaSafetyData?.reactions?.length > 0 && (
+                                      <button
+                                        onClick={() => exportFDAReactionsToCSV(selectedItem.name, fdaSafetyData.reactions)}
+                                        className="export-csv-btn text-button"
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          padding: '6px 12px',
+                                          borderRadius: '6px',
+                                          border: '1px solid var(--border-color)',
+                                          background: 'var(--overlay-light)',
+                                          color: 'var(--text-main)',
+                                          fontSize: '11px',
+                                          cursor: 'pointer',
+                                          fontWeight: 500,
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                      >
+                                        <Download size={12} /> Export CSV
+                                      </button>
+                                    )}
+                                  </div>
                                   <div className="reactions-list">
                                     {fdaSafetyData.reactions.map((react, i) => {
                                       const maxVal = fdaSafetyData.reactions[0]?.count || 1;
@@ -2206,6 +2486,7 @@ function App() {
                                       </span>
                                     </div>
                                   </div>
+                                  {pubChemData.formula && renderCompositionChart(pubChemData.formula)}
                                 </div>
 
                                 <div className="structure-card glass-card">
@@ -2233,17 +2514,95 @@ function App() {
                                 
                                 <div className="sandbox-workspace">
                                   <div className="sandbox-input-panel">
+                                    {/* Preset Search box */}
+                                    <div className="sandbox-preset-lookup" style={{ position: 'relative', width: '100%', marginBottom: '12px' }}>
+                                      <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 500 }}>
+                                        Search Compound Presets
+                                      </label>
+                                      <input 
+                                        type="text"
+                                        value={sandboxSearchQuery}
+                                        onChange={(e) => {
+                                          setSandboxSearchQuery(e.target.value);
+                                          setSandboxShowDropdown(true);
+                                        }}
+                                        onFocus={() => setSandboxShowDropdown(true)}
+                                        onBlur={() => setTimeout(() => setSandboxShowDropdown(false), 200)}
+                                        placeholder="Search preset structures (e.g. Ibuprofen)..."
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 12px',
+                                          borderRadius: '8px',
+                                          border: '1px solid var(--border-color)',
+                                          background: 'var(--overlay-light)',
+                                          color: 'var(--text-main)',
+                                          fontSize: '12px',
+                                          outline: 'none',
+                                          transition: 'border-color 0.2s ease'
+                                        }}
+                                      />
+                                      {sandboxShowDropdown && (
+                                        <div className="sandbox-lookup-dropdown glass-card animate-fade-in" style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: 0,
+                                          right: 0,
+                                          maxHeight: '180px',
+                                          overflowY: 'auto',
+                                          zIndex: 10,
+                                          marginTop: '4px',
+                                          borderRadius: '8px',
+                                          border: '1px solid var(--border-color)',
+                                          background: 'var(--bg-card)',
+                                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                        }}>
+                                          {PRESET_COMPOUNDS.filter(c => c.name.toLowerCase().includes(sandboxSearchQuery.toLowerCase())).map((c, idx) => (
+                                            <div
+                                              key={idx}
+                                              onClick={() => {
+                                                setSandboxSmiles(c.smiles);
+                                                setSandboxSearchQuery(c.name);
+                                                setSandboxShowDropdown(false);
+                                              }}
+                                              style={{
+                                                padding: '8px 12px',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-main)',
+                                                borderBottom: idx < PRESET_COMPOUNDS.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                transition: 'background 0.2s ease'
+                                              }}
+                                              className="sandbox-dropdown-item"
+                                            >
+                                              <span style={{ fontWeight: 500 }}>{c.name}</span>
+                                              <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>{c.formula}</span>
+                                            </div>
+                                          ))}
+                                          {PRESET_COMPOUNDS.filter(c => c.name.toLowerCase().includes(sandboxSearchQuery.toLowerCase())).length === 0 && (
+                                            <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                              No preset compounds match.
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+
                                     <textarea 
                                       className="sandbox-textarea glass-card"
                                       value={sandboxSmiles}
-                                      onChange={(e) => setSandboxSmiles(e.target.value)}
+                                      onChange={(e) => {
+                                        setSandboxSmiles(e.target.value);
+                                        setSandboxSearchQuery('');
+                                      }}
                                       placeholder="Paste SMILES (e.g. C1=CC=C(C=C1)C=O)..."
                                     />
                                     <div className="presets-row">
                                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Examples:</span>
-                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('CC(=O)Oc1ccccc1C(=O)O')}>Aspirin</button>
-                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('Cc1ccc(cc1)C(=O)Nc2ccc(cc2)CN3CCN(CC3)C')}>Imatinib</button>
-                                      <button type="button" className="preset-btn" onClick={() => setSandboxSmiles('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')}>Caffeine</button>
+                                      <button type="button" className="preset-btn" onClick={() => { setSandboxSmiles('CC(=O)Oc1ccccc1C(=O)O'); setSandboxSearchQuery('Aspirin'); }}>Aspirin</button>
+                                      <button type="button" className="preset-btn" onClick={() => { setSandboxSmiles('Cc1ccc(cc1)C(=O)Nc2ccc(cc2)CN3CCN(CC3)C'); setSandboxSearchQuery('Imatinib'); }}>Imatinib</button>
+                                      <button type="button" className="preset-btn" onClick={() => { setSandboxSmiles('CN1C=NC2=C1C(=O)N(C(=O)N2C)C'); setSandboxSearchQuery('Caffeine'); }}>Caffeine</button>
                                     </div>
                                   </div>
 
@@ -2254,31 +2613,38 @@ function App() {
                                         <span>Resolving SMILES structure...</span>
                                       </div>
                                     ) : sandboxData ? (
-                                      <div className="sandbox-result animate-fade-in">
-                                        <div className="sandbox-svg-container">
-                                          <img 
-                                            src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(sandboxSmiles)}/record/SVG`} 
-                                            alt="SMILES structure representation"
-                                            className="sandbox-svg"
-                                            onError={(e) => {
-                                              e.target.style.display = 'none';
-                                              e.target.nextSibling.style.display = 'flex';
-                                            }}
-                                          />
-                                          <div className="sandbox-error-text" style={{ display: 'none' }}>
-                                            <span>Invalid SMILES Structure</span>
+                                      <div className="sandbox-result animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                                        <div>
+                                          <div className="sandbox-svg-container">
+                                            <img 
+                                              src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(sandboxSmiles)}/record/SVG`} 
+                                              alt="SMILES structure representation"
+                                              className="sandbox-svg"
+                                              onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
+                                              }}
+                                            />
+                                            <div className="sandbox-error-text" style={{ display: 'none' }}>
+                                              <span>Invalid SMILES Structure</span>
+                                            </div>
+                                          </div>
+                                          <div className="sandbox-properties" style={{ marginTop: '8px' }}>
+                                            <div className="prop-badge-row">
+                                              <span>Weight: <strong>{sandboxData.weight.toFixed(1)} Da</strong></span>
+                                              <span>LogP: <strong>{sandboxData.logP !== null ? sandboxData.logP.toFixed(2) : 'N/A'}</strong></span>
+                                            </div>
+                                            <div className="prop-badge-row" style={{ marginTop: '4px' }}>
+                                              <span>Donors: <strong>{sandboxData.donors}</strong></span>
+                                              <span>Acceptors: <strong>{sandboxData.acceptors}</strong></span>
+                                            </div>
                                           </div>
                                         </div>
-                                        <div className="sandbox-properties">
-                                          <div className="prop-badge-row">
-                                            <span>Weight: <strong>{sandboxData.weight.toFixed(1)} Da</strong></span>
-                                            <span>LogP: <strong>{sandboxData.logP !== null ? sandboxData.logP.toFixed(2) : 'N/A'}</strong></span>
+                                        {sandboxData.formula && (
+                                          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '12px' }}>
+                                            {renderCompositionChart(sandboxData.formula)}
                                           </div>
-                                          <div className="prop-badge-row">
-                                            <span>Donors: <strong>{sandboxData.donors}</strong></span>
-                                            <span>Acceptors: <strong>{sandboxData.acceptors}</strong></span>
-                                          </div>
-                                        </div>
+                                        )}
                                       </div>
                                     ) : (
                                       <div className="sandbox-empty">
@@ -2386,10 +2752,36 @@ function App() {
                         </div>
 
                         <div className="transcripts-card glass-card" style={{ padding: '16px' }}>
-                          <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Splice Transcripts</h3>
-                          <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                            Ensembl Transcript Isoforms mapped to genomic locus
-                          </p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div>
+                              <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: 0 }}>Splice Transcripts</h3>
+                              <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                                Ensembl Transcript Isoforms mapped to genomic locus
+                              </p>
+                            </div>
+                            {ensemblData?.transcripts?.length > 0 && (
+                              <button
+                                onClick={() => exportTranscriptsToCSV(selectedItem.name, ensemblData.transcripts)}
+                                className="export-csv-btn text-button"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--border-color)',
+                                  background: 'var(--overlay-light)',
+                                  color: 'var(--text-main)',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  fontWeight: 500,
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <Download size={12} /> Export CSV
+                              </button>
+                            )}
+                          </div>
                           {ensemblLoading ? (
                             <div className="loader-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px' }}>
                               <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
@@ -2767,7 +3159,7 @@ function App() {
 
       {showGlobalMapModal && (
         <div className="modal-backdrop" onClick={() => setShowGlobalMapModal(false)}>
-          <div className="glass-card modal-card" style={{ maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass-card modal-card" style={{ maxWidth: '1080px', width: '95%' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h2>Global Trial Distribution Explorer</h2>
@@ -2778,43 +3170,146 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
-              <div className="distribution-layout">
-                <div className="distribution-panel">
-                  <h3>Regional Trial Density</h3>
-                  <div className="geo-stat-bar-group">
-                    {trialDistribution.regions.map((reg, idx) => (
-                      <div key={idx} className="geo-bar-row">
-                        <div className="geo-bar-info">
-                          <span className="geo-bar-label">{reg.label}</span>
-                          <span className="geo-bar-value">{reg.value}</span>
-                        </div>
-                        <div className="geo-bar-track">
-                          <div className="geo-bar-fill" style={{ width: reg.fill }}></div>
-                        </div>
-                      </div>
-                    ))}
+              <div className="distribution-layout" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+                {/* Left Column: Interactive Map */}
+                <div className="glass-card map-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ fontSize: '16px', color: 'var(--accent-primary)', margin: 0 }}>Geographic Explorer Map</h3>
+                  <div style={{ position: 'relative', width: '100%', paddingBottom: '58.33%', height: 0, overflow: 'hidden' }}>
+                    <svg viewBox="0 0 600 350" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+                      <style>
+                        {`
+                          .map-region path {
+                            fill: var(--overlay-medium);
+                            stroke: var(--border-color);
+                            stroke-width: 1.5;
+                            transition: all 0.3s ease;
+                          }
+                          .map-region.active path,
+                          .map-region:hover path {
+                            fill: rgba(124, 58, 237, 0.35) !important;
+                            stroke: var(--accent-primary) !important;
+                          }
+                        `}
+                      </style>
+
+                      {/* North America Group */}
+                      <g 
+                        className={`map-region ${activeMapRegion === 'North America' ? 'active' : ''}`}
+                        onMouseEnter={() => setActiveMapRegion('North America')}
+                        onMouseLeave={() => setActiveMapRegion(null)}
+                      >
+                        {/* North America main */}
+                        <path d="M 40 40 L 160 30 L 190 70 L 140 135 L 90 140 L 50 110 Z" />
+                        {/* Greenland */}
+                        <path d="M 175 15 L 210 12 L 220 35 L 195 55 Z" />
+                      </g>
+
+                      {/* South America Group */}
+                      <g 
+                        className={`map-region ${activeMapRegion === 'South America' ? 'active' : ''}`}
+                        onMouseEnter={() => setActiveMapRegion('South America')}
+                        onMouseLeave={() => setActiveMapRegion(null)}
+                      >
+                        <path d="M 120 150 L 160 150 L 180 200 L 150 290 L 125 285 L 110 200 Z" />
+                      </g>
+
+                      {/* Europe Group */}
+                      <g 
+                        className={`map-region ${activeMapRegion === 'Europe' ? 'active' : ''}`}
+                        onMouseEnter={() => setActiveMapRegion('Europe')}
+                        onMouseLeave={() => setActiveMapRegion(null)}
+                      >
+                        <path d="M 230 50 L 300 45 L 320 100 L 240 120 Z" />
+                      </g>
+
+                      {/* East Asia Group */}
+                      <g 
+                        className={`map-region ${activeMapRegion === 'East Asia' ? 'active' : ''}`}
+                        onMouseEnter={() => setActiveMapRegion('East Asia')}
+                        onMouseLeave={() => setActiveMapRegion(null)}
+                      >
+                        <path d="M 330 50 L 460 50 L 480 120 L 450 200 L 360 200 L 330 110 Z" />
+                      </g>
+
+                      {/* Rest of World Group (Africa, Australia, Southern/Western Asia, etc) */}
+                      <g 
+                        className={`map-region ${activeMapRegion === 'Rest of World' ? 'active' : ''}`}
+                        onMouseEnter={() => setActiveMapRegion('Rest of World')}
+                        onMouseLeave={() => setActiveMapRegion(null)}
+                      >
+                        {/* Africa */}
+                        <path d="M 230 130 L 290 130 L 315 190 L 290 270 L 250 260 L 220 180 Z" />
+                        {/* Australia */}
+                        <path d="M 430 220 L 500 220 L 510 270 L 450 280 Z" />
+                        {/* Southern Asia/Middle East */}
+                        <path d="M 300 110 L 350 110 L 360 180 L 310 180 Z" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', fontStyle: 'italic' }}>
+                    Hover over regions or stats to view density highlight sync
                   </div>
                 </div>
 
-                <div className="distribution-panel">
-                  <h3>Clinical Phase Distribution</h3>
-                  <div className="phase-pill-grid">
-                    {trialDistribution.phases.map((phase, idx) => (
-                      <div key={idx} className="phase-pill-card">
-                        <span className="phase-pill-value">{phase.count}</span>
-                        <span className="phase-pill-label">{phase.label}</span>
-                      </div>
-                    ))}
+                {/* Right Column: Existing Stats Panels (stacked vertically) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="distribution-panel" style={{ width: '100%', margin: 0 }}>
+                    <h3>Regional Trial Density</h3>
+                    <div className="geo-stat-bar-group">
+                      {trialDistribution.regions.map((reg, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`geo-bar-row ${activeMapRegion === reg.label ? 'active-row' : ''}`}
+                          onMouseEnter={() => setActiveMapRegion(reg.label)}
+                          onMouseLeave={() => setActiveMapRegion(null)}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease',
+                            background: activeMapRegion === reg.label ? 'var(--overlay-medium)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: activeMapRegion === reg.label ? 'var(--border-color)' : 'transparent',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div className="geo-bar-info">
+                            <span className="geo-bar-label" style={{ fontWeight: activeMapRegion === reg.label ? 'bold' : 'normal' }}>{reg.label}</span>
+                            <span className="geo-bar-value">{reg.value}</span>
+                          </div>
+                          <div className="geo-bar-track">
+                            <div 
+                              className="geo-bar-fill" 
+                              style={{ 
+                                width: reg.fill,
+                                background: activeMapRegion === reg.label ? 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' : 'var(--accent-primary)'
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <h3 style={{ marginTop: '16px' }}>Top Contributing Countries</h3>
-                  <div className="country-list">
-                    {trialDistribution.countries.map((country, idx) => (
-                      <div key={idx} className="country-row">
-                        <span className="country-name">{country.name}</span>
-                        <span className="country-count">{country.count} trials</span>
-                      </div>
-                    ))}
+                  <div className="distribution-panel" style={{ width: '100%', margin: 0 }}>
+                    <h3>Clinical Phase Distribution</h3>
+                    <div className="phase-pill-grid">
+                      {trialDistribution.phases.map((phase, idx) => (
+                        <div key={idx} className="phase-pill-card">
+                          <span className="phase-pill-value">{phase.count}</span>
+                          <span className="phase-pill-label">{phase.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <h3 style={{ marginTop: '16px' }}>Top Contributing Countries</h3>
+                    <div className="country-list">
+                      {trialDistribution.countries.map((country, idx) => (
+                        <div key={idx} className="country-row">
+                          <span className="country-name">{country.name}</span>
+                          <span className="country-count">{country.count} trials</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3024,8 +3519,30 @@ function TrialsView() {
         </div>
       </header>
       <div className="glass-card full-width-card">
-        <div className="card-header">
-          <h3>Active Global Studies</h3>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <h3 style={{ margin: 0 }}>Active Global Studies</h3>
+          {!loading && trials.length > 0 && (
+            <button
+              onClick={() => exportTrialsToCSV(trials)}
+              className="export-csv-btn text-button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--overlay-light)',
+                color: 'var(--text-main)',
+                fontSize: '11px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Download size={12} /> Export CSV
+            </button>
+          )}
         </div>
         {loading ? (
           <div className="placeholder-content">
@@ -3094,84 +3611,6 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
   });
 
   const notifiedOutagesRef = useRef(new Set());
-
-  const [captchaStatus, setCaptchaStatus] = useState('idle'); // 'idle' | 'testing' | 'success' | 'error'
-  const [captchaLogs, setCaptchaLogs] = useState(null);
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LdyIQ8tAAAAAMxR5Vgt48zeaI-AAhb8fkB6Dpod';
-
-  const runCaptchaDiagnostics = async () => {
-    setCaptchaStatus('testing');
-    setCaptchaLogs(null);
-    try {
-      if (!window.grecaptcha) {
-        const scriptId = 'recaptcha-script';
-        let script = document.getElementById(scriptId);
-        if (!script) {
-          script = document.createElement('script');
-          script.id = scriptId;
-          script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
-          script.async = true;
-          script.defer = true;
-          document.body.appendChild(script);
-        }
-        
-        let elapsed = 0;
-        while (!window.grecaptcha && elapsed < 50) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          elapsed++;
-        }
-      }
-
-      if (!window.grecaptcha || !window.grecaptcha.execute) {
-        throw new Error('Google reCAPTCHA API client script failed to load. Please verify your internet connection or check browser extensions.');
-      }
-
-      const token = await new Promise((resolve, reject) => {
-        window.grecaptcha.ready(() => {
-          window.grecaptcha.execute(siteKey, { action: 'submit' })
-            .then(resolve)
-            .catch(err => reject(new Error(err.message || err || 'Token generation failed.')));
-        });
-      });
-
-      const response = await fetch('/api/diagnose-recaptcha', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        let errMsg = `Server returned status ${response.status}`;
-        try {
-          const errData = await response.json();
-          errMsg = errData.message || errMsg;
-        } catch {
-          try {
-            const rawText = await response.text();
-            if (rawText && rawText.length < 200) errMsg = rawText;
-          } catch {
-            // ignore error
-          }
-        }
-        throw new Error(`Diagnostics endpoint error: ${errMsg}`);
-      }
-
-      const result = await response.json();
-      setCaptchaLogs(result);
-
-      if (result.status === 'success' && result.recaptchaData.success) {
-        setCaptchaStatus('success');
-      } else {
-        setCaptchaStatus('error');
-      }
-    } catch (err) {
-      console.error(err);
-      setCaptchaStatus('error');
-      setCaptchaLogs({ status: 'error', message: err.message || 'Verification token failed to generate.' });
-    }
-  };
 
   useEffect(() => {
     let active = true;
@@ -3361,117 +3800,6 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
           <div className="source-item"><span>RCSB PDB (Structures)</span> {renderStatus(statuses.rcsbpdb)}</div>
         </div>
 
-        <div className="glass-card settings-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Shield size={20} style={{ color: 'var(--accent-primary)' }} />
-            <h3 style={{ margin: 0 }}>reCAPTCHA Security</h3>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
-            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Site Key Source:</span>
-              <span style={{ fontWeight: 500, fontFamily: 'monospace' }}>
-                {import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'Env Variable' : 'Default Fallback'}
-              </span>
-            </div>
-            
-            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Active Site Key:</span>
-              <span style={{ fontFamily: 'monospace', color: 'var(--text-main)' }} title={siteKey}>
-                {siteKey ? `${siteKey.slice(0, 6)}...${siteKey.slice(-6)}` : 'Not Configured'}
-              </span>
-            </div>
-
-            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Client Script:</span>
-              <span>
-                {window.grecaptcha ? (
-                  <span className="status-online" style={{ color: '#10b981', fontWeight: 600 }}>Active & Loaded</span>
-                ) : (
-                  <span className="status-checking" style={{ color: '#f59e0b', fontWeight: 600 }}>Not Loaded (Lazy-loaded on contact form)</span>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-            <button
-              onClick={runCaptchaDiagnostics}
-              disabled={captchaStatus === 'testing'}
-              className="primary-button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '13px',
-                opacity: captchaStatus === 'testing' ? 0.7 : 1
-              }}
-            >
-              {captchaStatus === 'testing' ? (
-                <>
-                  <Loader2 className="animate-spin" size={14} />
-                  <span>Verifying connection...</span>
-                </>
-              ) : (
-                <>
-                  <Play size={14} />
-                  <span>Run Verification Test</span>
-                </>
-              )}
-            </button>
-
-            {captchaStatus === 'success' && captchaLogs && (
-              <div className="contact-alert success animate-fade-in" style={{ padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '13px', textAlign: 'left' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 600, marginBottom: '6px' }}>
-                  <CheckCircle2 size={16} />
-                  <span>Site reCAPTCHA Verified!</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                  <div>• Success: {String(captchaLogs.recaptchaData.success)}</div>
-                  {captchaLogs.recaptchaData.score !== undefined && (
-                    <div>• Score: {captchaLogs.recaptchaData.score} (Likely Human)</div>
-                  )}
-                  {captchaLogs.recaptchaData.hostname && (
-                    <div>• Hostname: {captchaLogs.recaptchaData.hostname}</div>
-                  )}
-                  <div>• Secret Key Env: {captchaLogs.environmentVariables.hasSecretKeyEnv ? 'Defined' : 'Using Code Fallback'}</div>
-                </div>
-              </div>
-            )}
-
-            {captchaStatus === 'error' && captchaLogs && (
-              <div className="contact-alert error animate-fade-in" style={{ padding: '12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '13px', textAlign: 'left' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 600, marginBottom: '6px' }}>
-                  <AlertTriangle size={16} />
-                  <span>Test Failed</span>
-                </div>
-                <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-main)' }}>
-                  {captchaLogs.message || 'Google verification rejected the token.'}
-                </p>
-                {captchaLogs.recaptchaData && captchaLogs.recaptchaData['error-codes'] && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                    • Google Error: {captchaLogs.recaptchaData['error-codes'].join(', ')}
-                  </div>
-                )}
-                {captchaLogs.environmentVariables && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '6px', borderTop: '1px solid rgba(239, 68, 68, 0.15)', paddingTop: '6px' }}>
-                    <div>• Secret Key Env: {captchaLogs.environmentVariables.hasSecretKeyEnv ? 'Defined in Vercel' : 'Using Code Fallback'}</div>
-                    <div>• Active Secret Key: {captchaLogs.environmentVariables.secretKeyEndsWith}</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
