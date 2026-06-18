@@ -60,7 +60,8 @@ async function writeUserData(email, data) {
     try {
       const options = {
         access: 'public',
-        addRandomSuffix: false
+        addRandomSuffix: false,
+        allowOverwrite: true
       };
       if (BLOB_TOKEN) {
         options.token = BLOB_TOKEN;
