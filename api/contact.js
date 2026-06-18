@@ -45,15 +45,30 @@ export default async function handler(req, res) {
 
     const recaptchaData = await recaptchaResponse.json();
     const success = !!recaptchaData.success;
-    const score = recaptchaData.score !== undefined ? parseFloat(recaptchaData.score) : 0.0;
-    const action = recaptchaData.action || '';
 
     // Handle verification checks
-    if (!success || score < 0.5 || action !== 'submit') {
+    if (!success) {
       console.warn('reCAPTCHA failed:', recaptchaData);
       return res.status(400).json({ 
         status: 'error', 
         message: 'Google reCAPTCHA verification failed. Please try again.' 
+      });
+    }
+
+    // Only validate score and action if they are returned by Google (v3 specific)
+    if (recaptchaData.score !== undefined && parseFloat(recaptchaData.score) < 0.5) {
+      console.warn('reCAPTCHA low score:', recaptchaData);
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'reCAPTCHA flagged request as potential spam. Please try again.' 
+      });
+    }
+
+    if (recaptchaData.action !== undefined && recaptchaData.action !== 'submit') {
+      console.warn('reCAPTCHA action mismatch:', recaptchaData);
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'reCAPTCHA verification failed due to action mismatch.' 
       });
     }
 

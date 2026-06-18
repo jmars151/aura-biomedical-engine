@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download } from 'lucide-react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Shield, CheckCircle2, AlertTriangle, Play } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
@@ -3095,6 +3095,84 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
 
   const notifiedOutagesRef = useRef(new Set());
 
+  const [captchaStatus, setCaptchaStatus] = useState('idle'); // 'idle' | 'testing' | 'success' | 'error'
+  const [captchaLogs, setCaptchaLogs] = useState(null);
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LdyIQ8tAAAAAMxR5Vgt48zeaI-AAhb8fkB6Dpod';
+
+  const runCaptchaDiagnostics = async () => {
+    setCaptchaStatus('testing');
+    setCaptchaLogs(null);
+    try {
+      if (!window.grecaptcha) {
+        const scriptId = 'recaptcha-script';
+        let script = document.getElementById(scriptId);
+        if (!script) {
+          script = document.createElement('script');
+          script.id = scriptId;
+          script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+          script.async = true;
+          script.defer = true;
+          document.body.appendChild(script);
+        }
+        
+        let elapsed = 0;
+        while (!window.grecaptcha && elapsed < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          elapsed++;
+        }
+      }
+
+      if (!window.grecaptcha || !window.grecaptcha.execute) {
+        throw new Error('Google reCAPTCHA API client script failed to load. Please verify your internet connection or check browser extensions.');
+      }
+
+      const token = await new Promise((resolve, reject) => {
+        window.grecaptcha.ready(() => {
+          window.grecaptcha.execute(siteKey, { action: 'submit' })
+            .then(resolve)
+            .catch(err => reject(new Error(err.message || err || 'Token generation failed.')));
+        });
+      });
+
+      const response = await fetch('/api/diagnose-recaptcha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        let errMsg = `Server returned status ${response.status}`;
+        try {
+          const errData = await response.json();
+          errMsg = errData.message || errMsg;
+        } catch {
+          try {
+            const rawText = await response.text();
+            if (rawText && rawText.length < 200) errMsg = rawText;
+          } catch {
+            // ignore error
+          }
+        }
+        throw new Error(`Diagnostics endpoint error: ${errMsg}`);
+      }
+
+      const result = await response.json();
+      setCaptchaLogs(result);
+
+      if (result.status === 'success' && result.recaptchaData.success) {
+        setCaptchaStatus('success');
+      } else {
+        setCaptchaStatus('error');
+      }
+    } catch (err) {
+      console.error(err);
+      setCaptchaStatus('error');
+      setCaptchaLogs({ status: 'error', message: err.message || 'Verification token failed to generate.' });
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -3270,6 +3348,7 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
             </div>
           </div>
         </div>
+
         <div className="glass-card settings-card">
           <h3>Data Sources</h3>
           <div className="source-item"><span>ChEMBL API</span> {renderStatus(statuses.chembl)}</div>
@@ -3280,6 +3359,112 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
           <div className="source-item"><span>GTEx Portal (Expression)</span> {renderStatus(statuses.gtex)}</div>
           <div className="source-item"><span>GWAS Catalog (ClinVar)</span> {renderStatus(statuses.gwas)}</div>
           <div className="source-item"><span>RCSB PDB (Structures)</span> {renderStatus(statuses.rcsbpdb)}</div>
+        </div>
+
+        <div className="glass-card settings-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Shield size={20} style={{ color: 'var(--accent-primary)' }} />
+            <h3 style={{ margin: 0 }}>reCAPTCHA Security</h3>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Site Key Source:</span>
+              <span style={{ fontWeight: 500, fontFamily: 'monospace' }}>
+                {import.meta.env.VITE_RECAPTCHA_SITE_KEY ? 'Env Variable' : 'Default Fallback'}
+              </span>
+            </div>
+            
+            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Active Site Key:</span>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-main)' }} title={siteKey}>
+                {siteKey ? `${siteKey.slice(0, 6)}...${siteKey.slice(-6)}` : 'Not Configured'}
+              </span>
+            </div>
+
+            <div className="source-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Client Script:</span>
+              <span>
+                {window.grecaptcha ? (
+                  <span className="status-online" style={{ color: '#10b981', fontWeight: 600 }}>Active & Loaded</span>
+                ) : (
+                  <span className="status-checking" style={{ color: '#f59e0b', fontWeight: 600 }}>Not Loaded (Lazy-loaded on contact form)</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+            <button
+              onClick={runCaptchaDiagnostics}
+              disabled={captchaStatus === 'testing'}
+              className="primary-button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+                opacity: captchaStatus === 'testing' ? 0.7 : 1
+              }}
+            >
+              {captchaStatus === 'testing' ? (
+                <>
+                  <Loader2 className="animate-spin" size={14} />
+                  <span>Verifying connection...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={14} />
+                  <span>Run Verification Test</span>
+                </>
+              )}
+            </button>
+
+            {captchaStatus === 'success' && captchaLogs && (
+              <div className="contact-alert success animate-fade-in" style={{ padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '13px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 600, marginBottom: '6px' }}>
+                  <CheckCircle2 size={16} />
+                  <span>Site reCAPTCHA Verified!</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  <div>• Success: {String(captchaLogs.recaptchaData.success)}</div>
+                  {captchaLogs.recaptchaData.score !== undefined && (
+                    <div>• Score: {captchaLogs.recaptchaData.score} (Likely Human)</div>
+                  )}
+                  {captchaLogs.recaptchaData.hostname && (
+                    <div>• Hostname: {captchaLogs.recaptchaData.hostname}</div>
+                  )}
+                  <div>• Secret Key Env: {captchaLogs.environmentVariables.hasSecretKeyEnv ? 'Defined' : 'Using Code Fallback'}</div>
+                </div>
+              </div>
+            )}
+
+            {captchaStatus === 'error' && captchaLogs && (
+              <div className="contact-alert error animate-fade-in" style={{ padding: '12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '13px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 600, marginBottom: '6px' }}>
+                  <AlertTriangle size={16} />
+                  <span>Test Failed</span>
+                </div>
+                <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-main)' }}>
+                  {captchaLogs.message || 'Google verification rejected the token.'}
+                </p>
+                {captchaLogs.recaptchaData && captchaLogs.recaptchaData['error-codes'] && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                    • Google Error: {captchaLogs.recaptchaData['error-codes'].join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
