@@ -225,13 +225,6 @@ function App() {
   const prevAnalysesRef = useRef(pendingAnalyses);
   const [isLoaded, setIsLoaded] = useState(false);
   const searchBlurTimeoutRef = useRef(null);
-  const [debugLogs, setDebugLogs] = useState([]);
-  const addDebugLog = useCallback((msg) => {
-    setTimeout(() => {
-      setDebugLogs(prev => [msg, ...prev].slice(0, 30));
-    }, 0);
-    console.log('[DEBUG]', msg);
-  }, []);
 
 
 
@@ -1361,27 +1354,21 @@ function App() {
   // Sync state on user change
   useEffect(() => {
     if (!currentUser) {
-      addDebugLog('Sync state on user change: no currentUser, returning early.');
       return;
     }
     
     let isMounted = true;
     const userKey = `aura_user_data_${currentUser.email}`;
-    addDebugLog(`Sync state on user change triggered for: ${currentUser.email}, userKey: ${userKey}`);
     
     async function syncUserData() {
       try {
-        addDebugLog('syncUserData: Fetching from server...');
         const response = await fetch(`/api/library?email=${encodeURIComponent(currentUser.email)}`);
-        addDebugLog(`syncUserData: Fetch response status: ${response.status}`);
-        if (!response.ok) throw new Error(`Failed to fetch from server (status ${response.status})`);
+        if (!response.ok) throw new Error('Failed to fetch from server');
         const resJson = await response.json();
-        addDebugLog(`syncUserData: Server response JSON: ${JSON.stringify(resJson)}`);
         
         if (isMounted) {
           if (resJson.status === 'success' && resJson.data) {
             const data = resJson.data;
-            addDebugLog(`syncUserData: Success, setting state from server data. Items: ${JSON.stringify(data.libraryItems || [])}`);
             setLibraryItems(data.libraryItems || []);
             setGlassmorphismIntensity(data.glassmorphismIntensity ?? 80);
             setDarkMode(data.darkMode ?? true);
@@ -1396,10 +1383,8 @@ function App() {
             localStorage.setItem(userKey, JSON.stringify(data));
           } else {
             // No data on server, check local storage
-            addDebugLog('syncUserData: No data on server (null). Checking localStorage...');
             const savedData = localStorage.getItem(userKey);
             if (savedData) {
-              addDebugLog(`syncUserData: Found data in localStorage, parsing and setting: ${savedData}`);
               const parsed = JSON.parse(savedData);
               setLibraryItems(parsed.libraryItems || []);
               setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1411,8 +1396,7 @@ function App() {
               setNotifications(parsed.notifications || []);
               
               // Push local storage data to server
-              addDebugLog('syncUserData: Pushing localStorage data to server...');
-              const pushRes = await fetch('/api/library', {
+              await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1420,10 +1404,8 @@ function App() {
                   ...parsed
                 })
               });
-              addDebugLog(`syncUserData: Pushing localStorage data response status: ${pushRes.status}`);
             } else {
               // Create default settings
-              addDebugLog('syncUserData: No localStorage data found. Seeding defaults...');
               const defaultLibrary = [
                 { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
                 { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
@@ -1464,8 +1446,7 @@ function App() {
               localStorage.setItem(userKey, JSON.stringify(defaultData));
               
               // Push to server
-              addDebugLog('syncUserData: Pushing seeded defaults to server...');
-              const defaultRes = await fetch('/api/library', {
+              await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1473,21 +1454,17 @@ function App() {
                   ...defaultData
                 })
               });
-              addDebugLog(`syncUserData: Seeding defaults response status: ${defaultRes.status}`);
             }
           }
           // Mark state as fully loaded so future changes will sync to server
-          addDebugLog('syncUserData: Marking isLoaded as true.');
           setIsLoaded(true);
         }
       } catch (err) {
-        console.error('[DEBUG] syncUserData error during sync:', err);
-        addDebugLog(`syncUserData error during sync: ${err.message || err}`);
+        console.error('Error syncing user data with server:', err);
         // Fallback to local storage if server is offline
         if (isMounted) {
           const savedData = localStorage.getItem(userKey);
           if (savedData) {
-            addDebugLog(`syncUserData offline fallback: loaded data from localStorage: ${savedData}`);
             const parsed = JSON.parse(savedData);
             setLibraryItems(parsed.libraryItems || []);
             setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1508,17 +1485,11 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser, addDebugLog]);
+  }, [currentUser]);
 
   // Sync state back to localStorage and server
   useEffect(() => {
-    addDebugLog(`Save useEffect triggered. hasUser: ${!!currentUser}, userEmail: ${currentUser ? currentUser.email : null}, isLoaded: ${isLoaded}, libraryCount: ${libraryItems.length}`);
-    if (!currentUser || !isLoaded) {
-      addDebugLog('Save useEffect skipped (guard failed).');
-      return;
-    }
-    
-    addDebugLog(`Save useEffect guard passed. Saving libraryItems: ${JSON.stringify(libraryItems)}`);
+    if (!currentUser || !isLoaded) return;
     const userKey = `aura_user_data_${currentUser.email}`;
     const currentData = {
       libraryItems,
@@ -1539,18 +1510,8 @@ function App() {
         email: currentUser.email,
         ...currentData
       })
-    })
-    .then(res => {
-      addDebugLog(`Save response status: ${res.status}`);
-      return res.json();
-    })
-    .then(resJson => {
-      addDebugLog(`Save response from server: ${JSON.stringify(resJson)}`);
-    })
-    .catch(err => {
-      addDebugLog(`Error syncing library to server: ${err.message || err}`);
-    });
-  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded, addDebugLog]);
+    }).catch(err => console.error('Error syncing user library to server:', err));
+  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded]);
 
 
   // Apply glassmorphism intensity CSS variable
@@ -4234,43 +4195,6 @@ function App() {
           </div>
         </div>
       )}
-      {/* Floating Debug Panel */}
-      <div style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        width: '420px',
-        maxHeight: '300px',
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
-        borderRadius: '12px',
-        color: '#fff',
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        padding: '12px',
-        zIndex: 99999,
-        overflowY: 'auto',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
-          <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>AURA SYSTEM LOGS</span>
-          <button onClick={() => setDebugLogs([])} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '10px' }}>Clear</button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1 }}>
-          {debugLogs.length === 0 ? (
-            <span style={{ color: '#64748b' }}>No logs yet...</span>
-          ) : (
-            debugLogs.map((log, index) => (
-              <div key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                {log}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -4414,20 +4338,20 @@ function LibraryView({ libraryItems, setLibraryItems, addNotification, onItemSel
               <select 
                 value={newType} 
                 onChange={e => setNewType(e.target.value)}
-                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)' }}
               >
-                <option value="Drug" style={{ background: '#0a0a0c' }}>Drug</option>
-                <option value="Protein" style={{ background: '#0a0a0c' }}>Protein</option>
-                <option value="Compound" style={{ background: '#0a0a0c' }}>Compound</option>
+                <option value="Drug" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Drug</option>
+                <option value="Protein" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Protein</option>
+                <option value="Compound" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Compound</option>
               </select>
               <select 
                 value={newStatus} 
                 onChange={e => setNewStatus(e.target.value)}
-                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
+                style={{ flex: 1, padding: '4px 6px', fontSize: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)' }}
               >
-                <option value="Active" style={{ background: '#0a0a0c' }}>Active</option>
-                <option value="Approved" style={{ background: '#0a0a0c' }}>Approved</option>
-                <option value="Pending" style={{ background: '#0a0a0c' }}>Pending</option>
+                <option value="Active" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Active</option>
+                <option value="Approved" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Approved</option>
+                <option value="Pending" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>Pending</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
