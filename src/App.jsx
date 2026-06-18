@@ -1365,6 +1365,7 @@ function App() {
     setActiveView('dashboard');
     setSelectedItem(null);
     setShowComparison(false);
+    setComparisonList([]);
     setResults(null);
     setSearchQuery('');
     setSidebarOpen(false);
@@ -1657,9 +1658,14 @@ function App() {
           <div className="mobile-actions">
             {comparisonList.length > 0 && (
               <button 
-                className={`comparison-toggle-mini glass-card ${showComparison ? 'active' : ''}`}
+                className={`comparison-toggle-mini glass-card ${showComparison && activeView === 'dashboard' ? 'active' : ''}`}
                 onClick={() => {
-                  setShowComparison(!showComparison);
+                  const nextShow = !(showComparison && activeView === 'dashboard');
+                  setShowComparison(nextShow);
+                  if (nextShow) {
+                    setActiveView('dashboard');
+                    setSelectedItem(null);
+                  }
                   setResults(null);
                   setSearchQuery('');
                 }}
@@ -1888,9 +1894,14 @@ function App() {
           <div className="top-bar-actions">
             {comparisonList.length > 0 && (
               <button 
-                className={`comparison-toggle glass-card ${showComparison ? 'active' : ''}`}
+                className={`comparison-toggle glass-card ${showComparison && activeView === 'dashboard' ? 'active' : ''}`}
                 onClick={() => {
-                  setShowComparison(!showComparison);
+                  const nextShow = !(showComparison && activeView === 'dashboard');
+                  setShowComparison(nextShow);
+                  if (nextShow) {
+                    setActiveView('dashboard');
+                    setSelectedItem(null);
+                  }
                   setResults(null);
                   setSearchQuery('');
                 }}
