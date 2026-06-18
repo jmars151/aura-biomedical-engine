@@ -2269,4 +2269,69 @@
   border-radius: 4px;
 }
 
+/* Responsive adjustments for comparison cards and header actions */
+.comparison-header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.constraint-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.lipinski-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.safety-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.clinical-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .clinical-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .comparison-view .section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+  
+  .comparison-header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  
+  .comparison-header-actions button,
+  .comparison-header-actions .back-button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .clinical-trials-tab-layout {
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .constraint-grid,
+  .lipinski-grid,
+  .safety-stats-grid,
+  .clinical-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 

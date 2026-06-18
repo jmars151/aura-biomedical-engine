@@ -2236,7 +2236,7 @@ function App() {
                   <h1>Comparative Analysis</h1>
                   <p className="subtitle">Side-by-side target evaluation</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="comparison-header-actions" style={{ display: 'flex', gap: '12px' }}>
                   {comparisonList.filter(item => item.type === 'Protein').length >= 2 && (
                     <button 
                       className="primary-button" 
@@ -2409,7 +2409,7 @@ function App() {
                                 </div>
                               )}
                               {details.extraMetadata?.pLI !== undefined && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '2px' }}>
+                                <div className="constraint-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '2px' }}>
                                   <div style={{ background: 'var(--overlay-light)', borderRadius: '6px', padding: '4px 8px', display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>LoF Intolerance (pLI)</span>
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: details.extraMetadata.pLI >= 0.9 ? '#22c55e' : 'var(--text-main)' }}>
@@ -2534,7 +2534,7 @@ function App() {
                                   {lipinskiPassCount}/4 Passed
                                 </span>
                               </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                              <div className="lipinski-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                                 {lipinskiRules.map((r, idx) => (
                                   <div key={idx} style={{ 
                                     display: 'flex', 
@@ -2556,7 +2556,7 @@ function App() {
                           {safety && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>FDA Safety Analytics</span>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', textAlign: 'center' }}>
+                              <div className="safety-stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', textAlign: 'center' }}>
                                 <div style={{ background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.1)', borderRadius: '6px', padding: '6px' }}>
                                   <span style={{ display: 'block', fontSize: '9px', color: '#f43f5e', fontWeight: '500' }}>Serious Deaths</span>
                                   <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#f43f5e' }}>{safety.death.toLocaleString()}</span>
@@ -3280,7 +3280,7 @@ function App() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                               
                               {/* Big Stats Row */}
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                              <div className="clinical-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                                 <div style={{ background: 'var(--overlay-light)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
                                   <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>Total Registered Trials</span>
                                   <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>{clinicalTrialsData.total}</span>
@@ -3611,10 +3611,11 @@ function App() {
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     alignItems: 'center',
-                                    gap: '12px'
+                                    gap: '12px',
+                                    flexWrap: 'wrap'
                                   }}
                                 >
-                                  <div>
+                                  <div style={{ flex: '1 1 200px' }}>
                                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>
                                       {item.trait}
                                     </h4>

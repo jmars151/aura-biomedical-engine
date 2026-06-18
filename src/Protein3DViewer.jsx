@@ -202,7 +202,8 @@ const Protein3DViewer = ({ uniprotId }) => {
           justifyContent: 'space-between', 
           alignItems: 'center', 
           padding: '8px 16px',
-          gap: '12px' 
+          gap: '12px',
+          flexWrap: 'wrap'
         }}
       >
         <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>Conformer Selection</span>
