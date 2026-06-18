@@ -1491,7 +1491,7 @@ function App() {
 
   // Sync state back to localStorage and server
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !isLoadedRef.current) return;
     const userKey = `aura_user_data_${currentUser.email}`;
     const currentData = {
       libraryItems,
@@ -1504,17 +1504,15 @@ function App() {
     // Save to local storage
     localStorage.setItem(userKey, JSON.stringify(currentData));
     
-    // Only save to server if the initial fetch has completed
-    if (isLoadedRef.current) {
-      fetch('/api/library', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: currentUser.email,
-          ...currentData
-        })
-      }).catch(err => console.error('Error syncing user library to server:', err));
-    }
+    // Save to server
+    fetch('/api/library', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: currentUser.email,
+        ...currentData
+      })
+    }).catch(err => console.error('Error syncing user library to server:', err));
   }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser]);
 
 
