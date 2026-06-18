@@ -225,6 +225,13 @@ function App() {
   const prevAnalysesRef = useRef(pendingAnalyses);
   const [isLoaded, setIsLoaded] = useState(false);
   const searchBlurTimeoutRef = useRef(null);
+  const [debugLogs, setDebugLogs] = useState([]);
+  const addDebugLog = useCallback((msg) => {
+    setTimeout(() => {
+      setDebugLogs(prev => [msg, ...prev].slice(0, 30));
+    }, 0);
+    console.log('[DEBUG]', msg);
+  }, []);
 
 
 
@@ -1354,27 +1361,27 @@ function App() {
   // Sync state on user change
   useEffect(() => {
     if (!currentUser) {
-      console.log('[DEBUG] Sync state on user change: no currentUser, returning early.');
+      addDebugLog('Sync state on user change: no currentUser, returning early.');
       return;
     }
     
     let isMounted = true;
     const userKey = `aura_user_data_${currentUser.email}`;
-    console.log('[DEBUG] Sync state on user change triggered for:', currentUser.email, 'userKey:', userKey);
+    addDebugLog(`Sync state on user change triggered for: ${currentUser.email}, userKey: ${userKey}`);
     
     async function syncUserData() {
       try {
-        console.log('[DEBUG] syncUserData: Fetching from server...');
+        addDebugLog('syncUserData: Fetching from server...');
         const response = await fetch(`/api/library?email=${encodeURIComponent(currentUser.email)}`);
-        console.log('[DEBUG] syncUserData: Fetch response status:', response.status);
-        if (!response.ok) throw new Error('Failed to fetch from server');
+        addDebugLog(`syncUserData: Fetch response status: ${response.status}`);
+        if (!response.ok) throw new Error(`Failed to fetch from server (status ${response.status})`);
         const resJson = await response.json();
-        console.log('[DEBUG] syncUserData: Server response JSON:', resJson);
+        addDebugLog(`syncUserData: Server response JSON: ${JSON.stringify(resJson)}`);
         
         if (isMounted) {
           if (resJson.status === 'success' && resJson.data) {
             const data = resJson.data;
-            console.log('[DEBUG] syncUserData: Success, setting state from server data:', data);
+            addDebugLog(`syncUserData: Success, setting state from server data. Items: ${JSON.stringify(data.libraryItems || [])}`);
             setLibraryItems(data.libraryItems || []);
             setGlassmorphismIntensity(data.glassmorphismIntensity ?? 80);
             setDarkMode(data.darkMode ?? true);
@@ -1389,10 +1396,10 @@ function App() {
             localStorage.setItem(userKey, JSON.stringify(data));
           } else {
             // No data on server, check local storage
-            console.log('[DEBUG] syncUserData: No data on server (null). Checking localStorage...');
+            addDebugLog('syncUserData: No data on server (null). Checking localStorage...');
             const savedData = localStorage.getItem(userKey);
             if (savedData) {
-              console.log('[DEBUG] syncUserData: Found data in localStorage, parsing and setting:', savedData);
+              addDebugLog(`syncUserData: Found data in localStorage, parsing and setting: ${savedData}`);
               const parsed = JSON.parse(savedData);
               setLibraryItems(parsed.libraryItems || []);
               setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1404,8 +1411,8 @@ function App() {
               setNotifications(parsed.notifications || []);
               
               // Push local storage data to server
-              console.log('[DEBUG] syncUserData: Pushing localStorage data to server...');
-              await fetch('/api/library', {
+              addDebugLog('syncUserData: Pushing localStorage data to server...');
+              const pushRes = await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1413,9 +1420,10 @@ function App() {
                   ...parsed
                 })
               });
+              addDebugLog(`syncUserData: Pushing localStorage data response status: ${pushRes.status}`);
             } else {
               // Create default settings
-              console.log('[DEBUG] syncUserData: No localStorage data found. Seeding defaults...');
+              addDebugLog('syncUserData: No localStorage data found. Seeding defaults...');
               const defaultLibrary = [
                 { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
                 { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
@@ -1456,8 +1464,8 @@ function App() {
               localStorage.setItem(userKey, JSON.stringify(defaultData));
               
               // Push to server
-              console.log('[DEBUG] syncUserData: Pushing seeded defaults to server...');
-              await fetch('/api/library', {
+              addDebugLog('syncUserData: Pushing seeded defaults to server...');
+              const defaultRes = await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1465,19 +1473,21 @@ function App() {
                   ...defaultData
                 })
               });
+              addDebugLog(`syncUserData: Seeding defaults response status: ${defaultRes.status}`);
             }
           }
           // Mark state as fully loaded so future changes will sync to server
-          console.log('[DEBUG] syncUserData: Marking isLoaded as true.');
+          addDebugLog('syncUserData: Marking isLoaded as true.');
           setIsLoaded(true);
         }
       } catch (err) {
         console.error('[DEBUG] syncUserData error during sync:', err);
+        addDebugLog(`syncUserData error during sync: ${err.message || err}`);
         // Fallback to local storage if server is offline
         if (isMounted) {
           const savedData = localStorage.getItem(userKey);
           if (savedData) {
-            console.log('[DEBUG] syncUserData offline fallback: loaded data from localStorage:', savedData);
+            addDebugLog(`syncUserData offline fallback: loaded data from localStorage: ${savedData}`);
             const parsed = JSON.parse(savedData);
             setLibraryItems(parsed.libraryItems || []);
             setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1498,22 +1508,17 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser]);
+  }, [currentUser, addDebugLog]);
 
   // Sync state back to localStorage and server
   useEffect(() => {
-    console.log('[DEBUG] Save useEffect triggered. Status:', {
-      hasUser: !!currentUser,
-      userEmail: currentUser ? currentUser.email : null,
-      isLoaded,
-      libraryCount: libraryItems.length
-    });
+    addDebugLog(`Save useEffect triggered. hasUser: ${!!currentUser}, userEmail: ${currentUser ? currentUser.email : null}, isLoaded: ${isLoaded}, libraryCount: ${libraryItems.length}`);
     if (!currentUser || !isLoaded) {
-      console.log('[DEBUG] Save useEffect skipped (guard failed).');
+      addDebugLog('Save useEffect skipped (guard failed).');
       return;
     }
     
-    console.log('[DEBUG] Save useEffect guard passed. Saving libraryItems:', libraryItems);
+    addDebugLog(`Save useEffect guard passed. Saving libraryItems: ${JSON.stringify(libraryItems)}`);
     const userKey = `aura_user_data_${currentUser.email}`;
     const currentData = {
       libraryItems,
@@ -1535,12 +1540,17 @@ function App() {
         ...currentData
       })
     })
-    .then(res => res.json())
-    .then(resJson => {
-      console.log('[DEBUG] Save response from server:', resJson);
+    .then(res => {
+      addDebugLog(`Save response status: ${res.status}`);
+      return res.json();
     })
-    .catch(err => console.error('[DEBUG] Error syncing user library to server:', err));
-  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded]);
+    .then(resJson => {
+      addDebugLog(`Save response from server: ${JSON.stringify(resJson)}`);
+    })
+    .catch(err => {
+      addDebugLog(`Error syncing library to server: ${err.message || err}`);
+    });
+  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded, addDebugLog]);
 
 
   // Apply glassmorphism intensity CSS variable
@@ -4224,6 +4234,43 @@ function App() {
           </div>
         </div>
       )}
+      {/* Floating Debug Panel */}
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        width: '420px',
+        maxHeight: '300px',
+        background: 'rgba(15, 23, 42, 0.95)',
+        border: '1px solid rgba(139, 92, 246, 0.3)',
+        borderRadius: '12px',
+        color: '#fff',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        padding: '12px',
+        zIndex: 99999,
+        overflowY: 'auto',
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+          <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>AURA SYSTEM LOGS</span>
+          <button onClick={() => setDebugLogs([])} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '10px' }}>Clear</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1 }}>
+          {debugLogs.length === 0 ? (
+            <span style={{ color: '#64748b' }}>No logs yet...</span>
+          ) : (
+            debugLogs.map((log, index) => (
+              <div key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {log}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
