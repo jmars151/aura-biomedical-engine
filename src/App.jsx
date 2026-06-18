@@ -224,6 +224,8 @@ function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const prevAnalysesRef = useRef(pendingAnalyses);
   const isLoadedRef = useRef(false);
+  const searchBlurTimeoutRef = useRef(null);
+
 
 
   const addNotification = useCallback((title, message, type = 'info') => {
@@ -2088,8 +2090,17 @@ function App() {
                 placeholder="Search molecular targets, drugs, or clinical trials..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                onFocus={() => {
+                  if (searchBlurTimeoutRef.current) {
+                    clearTimeout(searchBlurTimeoutRef.current);
+                  }
+                  setIsSearchFocused(true);
+                }}
+                onBlur={() => {
+                  searchBlurTimeoutRef.current = setTimeout(() => {
+                    setIsSearchFocused(false);
+                  }, 200);
+                }}
                 ref={searchInputRef}
                 className="search-input"
               />
