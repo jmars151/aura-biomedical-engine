@@ -5,8 +5,8 @@ import path from 'path';
 const DB_PATH = path.join(process.cwd(), 'api', 'library_db.json');
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
-// Check if Vercel Blob is configured
-const isBlobConfigured = () => !!BLOB_TOKEN;
+// Check if Vercel Blob is configured (either via static token or native Vercel OIDC)
+const isBlobConfigured = () => !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 
 // Read user data from Vercel Blob or local JSON file
 async function readUserData(email) {
@@ -15,9 +15,14 @@ async function readUserData(email) {
   
   if (isBlobConfigured()) {
     try {
+      const options = {};
+      if (BLOB_TOKEN) {
+        options.token = BLOB_TOKEN;
+      }
+      
       const { blobs } = await list({
         prefix: filename,
-        token: BLOB_TOKEN
+        ...options
       });
       
       if (blobs && blobs.length > 0) {
@@ -52,11 +57,15 @@ async function writeUserData(email, data) {
 
   if (isBlobConfigured()) {
     try {
-      await put(filename, JSON.stringify(data), {
+      const options = {
         access: 'public',
-        addRandomSuffix: false,
-        token: BLOB_TOKEN
-      });
+        addRandomSuffix: false
+      };
+      if (BLOB_TOKEN) {
+        options.token = BLOB_TOKEN;
+      }
+      
+      await put(filename, JSON.stringify(data), options);
       return;
     } catch (err) {
       console.error('Error writing to Vercel Blob cloud:', err);
@@ -110,13 +119,8 @@ export default async function handler(req, res) {
         diagnostics: {
           isBlobConfigured: isBlobConfigured(),
           tokenPresent: !!process.env.BLOB_READ_WRITE_TOKEN,
-          nodeVersion: process.version,
-          envKeys: Object.keys(process.env).filter(k => 
-            !k.toLowerCase().includes('secret') && 
-            !k.toLowerCase().includes('token') && 
-            !k.toLowerCase().includes('key') && 
-            !k.toLowerCase().includes('pass')
-          )
+          storeIdPresent: !!process.env.BLOB_STORE_ID,
+          nodeVersion: process.version
         }
       });
     }
