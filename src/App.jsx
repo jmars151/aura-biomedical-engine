@@ -2053,7 +2053,7 @@ function App() {
               ))}
             </div>
 
-            {results && (
+            {isSearchFocused && results && (
               <div className="search-results glass-card animate-fade-in">
                 {Object.entries(results)
                   .filter(([type]) => searchFilter === 'all' || type === searchFilter)
