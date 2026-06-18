@@ -42,3 +42,7 @@ coverage/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+
+# Local Database Files
+api/library_db.json
+

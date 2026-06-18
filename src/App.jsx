@@ -223,6 +223,8 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const prevAnalysesRef = useRef(pendingAnalyses);
+  const isLoadedRef = useRef(false);
+
 
   const addNotification = useCallback((title, message, type = 'info') => {
     const newNotification = {
@@ -659,11 +661,11 @@ function App() {
   // Synchronize state -> hash router
   useEffect(() => {
     let newHash;
-    if (activeView === 'dashboard') {
+    if (selectedItem) {
+      newHash = `detail/${selectedItem.type}/${selectedItem.id}/${encodeURIComponent(selectedItem.name)}`;
+    } else if (activeView === 'dashboard') {
       if (showComparison) {
         newHash = 'compare';
-      } else if (selectedItem) {
-        newHash = `detail/${selectedItem.type}/${selectedItem.id}/${encodeURIComponent(selectedItem.name)}`;
       } else {
         newHash = 'dashboard';
       }
@@ -1349,91 +1351,143 @@ function App() {
 
   // Sync state on user change
   useEffect(() => {
-    if (!currentUser) return;
-    const userKey = `aura_user_data_${currentUser.email}`;
-    const savedData = localStorage.getItem(userKey);
+    if (!currentUser) {
+      setLibraryItems([]);
+      isLoadedRef.current = false;
+      return;
+    }
     
-    // Defer state updates to avoid synchronous setState inside useEffect warning
-    Promise.resolve().then(() => {
-      if (savedData) {
-        const parsed = JSON.parse(savedData);
-        setLibraryItems(parsed.libraryItems || []);
-        setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
-        setDarkMode(parsed.darkMode ?? true);
-        if (parsed.pendingAnalyses) {
-          setPendingAnalyses(parsed.pendingAnalyses);
-          prevAnalysesRef.current = parsed.pendingAnalyses;
-        }
-        let loadedNotifications = parsed.notifications || [];
-        if (loadedNotifications.length === 0) {
-          loadedNotifications.push({
-            id: `welcome-${Date.now()}`,
-            title: 'Welcome to AURA!',
-            message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
-            type: 'welcome',
-            read: false,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
-          });
-        }
-
-        const hasUpgradeNotif = loadedNotifications.some(n => n.id === 'system-upgrade-v2');
-        if (!hasUpgradeNotif) {
-          const upgradeNotif = {
-            id: 'system-upgrade-v2',
-            title: 'System Upgrade: 5 New Data Feeds',
-            message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
-            type: 'info',
-            read: false,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
-          };
-          loadedNotifications = [upgradeNotif, ...loadedNotifications];
-          localStorage.setItem(userKey, JSON.stringify({
-            ...parsed,
-            notifications: loadedNotifications
-          }));
-        }
-        setNotifications(loadedNotifications);
-      } else {
-        const defaultLibrary = [
-          { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
-          { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
-          { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
-        ];
-        const welcomeMsg = {
-          id: `welcome-${Date.now()}`,
-          title: 'Welcome to AURA!',
-          message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
-          type: 'welcome',
-          read: false,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
-        };
-        const upgradeNotif = {
-          id: 'system-upgrade-v2',
-          title: 'System Upgrade: 5 New Data Feeds',
-          message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
-          type: 'info',
-          read: false,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
-        };
-        const initialNotifications = [upgradeNotif, welcomeMsg];
-        setLibraryItems(defaultLibrary);
-        setGlassmorphismIntensity(80);
-        setDarkMode(true);
-        setNotifications(initialNotifications);
-        prevAnalysesRef.current = INITIAL_PENDING_ANALYSES;
+    let isMounted = true;
+    const userKey = `aura_user_data_${currentUser.email}`;
+    
+    async function syncUserData() {
+      try {
+        const response = await fetch(`/api/library?email=${encodeURIComponent(currentUser.email)}`);
+        if (!response.ok) throw new Error('Failed to fetch from server');
+        const resJson = await response.json();
         
-        localStorage.setItem(userKey, JSON.stringify({
-          libraryItems: defaultLibrary,
-          glassmorphismIntensity: 80,
-          darkMode: true,
-          pendingAnalyses: INITIAL_PENDING_ANALYSES,
-          notifications: initialNotifications
-        }));
+        if (isMounted) {
+          if (resJson.status === 'success' && resJson.data) {
+            const data = resJson.data;
+            setLibraryItems(data.libraryItems || []);
+            setGlassmorphismIntensity(data.glassmorphismIntensity ?? 80);
+            setDarkMode(data.darkMode ?? true);
+            if (data.pendingAnalyses) {
+              setPendingAnalyses(data.pendingAnalyses);
+              prevAnalysesRef.current = data.pendingAnalyses;
+            }
+            if (data.notifications) {
+              setNotifications(data.notifications);
+            }
+            // Also update local storage to keep them in sync
+            localStorage.setItem(userKey, JSON.stringify(data));
+          } else {
+            // No data on server, check local storage
+            const savedData = localStorage.getItem(userKey);
+            if (savedData) {
+              const parsed = JSON.parse(savedData);
+              setLibraryItems(parsed.libraryItems || []);
+              setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
+              setDarkMode(parsed.darkMode ?? true);
+              if (parsed.pendingAnalyses) {
+                setPendingAnalyses(parsed.pendingAnalyses);
+                prevAnalysesRef.current = parsed.pendingAnalyses;
+              }
+              setNotifications(parsed.notifications || []);
+              
+              // Push local storage data to server
+              await fetch('/api/library', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: currentUser.email,
+                  ...parsed
+                })
+              });
+            } else {
+              // Create default settings
+              const defaultLibrary = [
+                { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
+                { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
+                { name: 'BRCA1', id: 'P38398', type: 'Protein', status: 'Active' }
+              ];
+              const welcomeMsg = {
+                id: `welcome-${Date.now()}`,
+                title: 'Welcome to AURA!',
+                message: `Hello ${currentUser.name}, welcome to the AURA Biomedical Intelligence Engine. We're excited to help you streamline your research. Check here for live system notifications and analysis updates.`,
+                type: 'welcome',
+                read: false,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+              };
+              const upgradeNotif = {
+                id: 'system-upgrade-v2',
+                title: 'System Upgrade: 5 New Data Feeds',
+                message: 'AURA has successfully integrated live data feeds from Europe PMC (publications), Ensembl (genomics), GTEx Portal (expression), GWAS Catalog (clinvar variants), and RCSB PDB (crystal structures selector). Explore target profiles to view them!',
+                type: 'info',
+                read: false,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
+              };
+              const initialNotifications = [upgradeNotif, welcomeMsg];
+              
+              setLibraryItems(defaultLibrary);
+              setGlassmorphismIntensity(80);
+              setDarkMode(true);
+              setNotifications(initialNotifications);
+              prevAnalysesRef.current = INITIAL_PENDING_ANALYSES;
+              
+              const defaultData = {
+                libraryItems: defaultLibrary,
+                glassmorphismIntensity: 80,
+                darkMode: true,
+                pendingAnalyses: INITIAL_PENDING_ANALYSES,
+                notifications: initialNotifications
+              };
+              
+              localStorage.setItem(userKey, JSON.stringify(defaultData));
+              
+              // Push to server
+              await fetch('/api/library', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: currentUser.email,
+                  ...defaultData
+                })
+              });
+            }
+          }
+          // Mark state as fully loaded so future changes will sync to server
+          isLoadedRef.current = true;
+        }
+      } catch (err) {
+        console.error('Error syncing user data with server:', err);
+        // Fallback to local storage if server is offline
+        if (isMounted) {
+          const savedData = localStorage.getItem(userKey);
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+            setLibraryItems(parsed.libraryItems || []);
+            setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
+            setDarkMode(parsed.darkMode ?? true);
+            if (parsed.pendingAnalyses) {
+              setPendingAnalyses(parsed.pendingAnalyses);
+              prevAnalysesRef.current = parsed.pendingAnalyses;
+            }
+            setNotifications(parsed.notifications || []);
+          }
+          isLoadedRef.current = true;
+        }
       }
-    });
+    }
+    
+    syncUserData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [currentUser]);
 
-  // Sync state back to localStorage
+  // Sync state back to localStorage and server
   useEffect(() => {
     if (!currentUser) return;
     const userKey = `aura_user_data_${currentUser.email}`;
@@ -1444,8 +1498,23 @@ function App() {
       pendingAnalyses,
       notifications
     };
+    
+    // Save to local storage
     localStorage.setItem(userKey, JSON.stringify(currentData));
+    
+    // Only save to server if the initial fetch has completed
+    if (isLoadedRef.current) {
+      fetch('/api/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          ...currentData
+        })
+      }).catch(err => console.error('Error syncing user library to server:', err));
+    }
   }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser]);
+
 
   // Apply glassmorphism intensity CSS variable
   useEffect(() => {
@@ -2288,6 +2357,11 @@ function App() {
               libraryItems={libraryItems} 
               setLibraryItems={setLibraryItems} 
               addNotification={addNotification}
+              onItemSelect={(item) => {
+                setSelectedItem(item);
+                setActiveView('dashboard');
+                setShowComparison(false);
+              }}
             />
           )}
           {activeView === 'trials' && <TrialsView />}
@@ -2793,7 +2867,7 @@ function App() {
                         <h2>{selectedItem.name}</h2>
                         <p className="id-tag">{selectedItem.id}</p>
                       </div>
-                      <div className="detail-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div className="detail-actions">
                         <button
                           onClick={() => window.print()}
                           className="external-link"
@@ -3357,7 +3431,7 @@ function App() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                               
                               {/* Big Stats Row */}
-                              <div className="clinical-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                              <div className="clinical-stats-grid">
                                 <div style={{ background: 'var(--overlay-light)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
                                   <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>Total Registered Trials</span>
                                   <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>{clinicalTrialsData.total}</span>
@@ -4149,7 +4223,7 @@ function InsightItem({ title, desc, time, onClick }) {
 }
 
 export default App;
-function LibraryView({ libraryItems, setLibraryItems, addNotification }) {
+function LibraryView({ libraryItems, setLibraryItems, addNotification, onItemSelect }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newId, setNewId] = useState('');
@@ -4190,10 +4264,16 @@ function LibraryView({ libraryItems, setLibraryItems, addNotification }) {
       </header>
       <div className="library-grid">
         {libraryItems.map((item) => (
-          <div key={item.id} className="glass-card library-card">
+          <div 
+            key={item.id} 
+            className="glass-card library-card"
+            onClick={() => onItemSelect && onItemSelect(item)}
+            style={{ cursor: onItemSelect ? 'pointer' : 'default' }}
+          >
             <button 
               className="remove-btn"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setLibraryItems(libraryItems.filter(i => i.id !== item.id));
                 if (addNotification) {
                   addNotification(

@@ -131,6 +131,20 @@
   box-shadow: 0 0 10px var(--accent-primary);
 }
 
+/* Detail view top bar actions */
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Clinical stats summary grid */
+.clinical-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
 /* Responsive adjustments for DetailView */
 @media (max-width: 768px) {
   .detail-view {
@@ -166,6 +180,37 @@
 
   .detail-visualizer {
     height: 200px;
+  }
+
+  .detail-actions {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .detail-actions button,
+  .detail-actions a {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    text-align: center;
+    font-size: 12px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .clinical-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-actions button,
+  .detail-actions a {
+    flex: 1 1 100% !important;
+  }
+  
+  .clinical-stats-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 
