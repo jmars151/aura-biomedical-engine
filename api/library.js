@@ -110,7 +110,13 @@ export default async function handler(req, res) {
         diagnostics: {
           isBlobConfigured: isBlobConfigured(),
           tokenPresent: !!process.env.BLOB_READ_WRITE_TOKEN,
-          nodeVersion: process.version
+          nodeVersion: process.version,
+          envKeys: Object.keys(process.env).filter(k => 
+            !k.toLowerCase().includes('secret') && 
+            !k.toLowerCase().includes('token') && 
+            !k.toLowerCase().includes('key') && 
+            !k.toLowerCase().includes('pass')
+          )
         }
       });
     }
