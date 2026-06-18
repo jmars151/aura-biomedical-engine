@@ -395,11 +395,13 @@ function App() {
         let safetyPromise = Promise.resolve(null);
         let successRatesPromise = Promise.resolve(null);
         let extraMetadataPromise = Promise.resolve(null);
+        let gwasPromise = Promise.resolve(null);
 
         if (isProtein) {
           extraPromise = fetchEnsemblGenomics(item.name).catch(() => null);
           pathwaysPromise = fetchReactomePathways(item.id).catch(() => null);
           extraMetadataPromise = fetchProteinSubcellularAndConstraint(item.id).catch(() => null);
+          gwasPromise = fetchGWASAssociations(item.name).catch(() => null);
         } else if (!isTrial) {
           extraPromise = fetchPubChemData(item.name).catch(() => null);
           safetyPromise = fetchFDASafetyData(item.name).catch(() => null);
@@ -407,13 +409,14 @@ function App() {
           extraMetadataPromise = fetchDrugMechanismAndStatus(item.id).catch(() => null);
         }
 
-        const [metrics, extra, pathways, safety, successRates, extraMetadata] = await Promise.all([
+        const [metrics, extra, pathways, safety, successRates, extraMetadata, gwas] = await Promise.all([
           metricsPromise,
           extraPromise,
           pathwaysPromise,
           safetyPromise,
           successRatesPromise,
-          extraMetadataPromise
+          extraMetadataPromise,
+          gwasPromise
         ]);
 
         setComparisonDetails(prev => ({
@@ -425,7 +428,8 @@ function App() {
             pathways,
             safety,
             successRates,
-            extraMetadata
+            extraMetadata,
+            gwas
           }
         }));
       } catch (err) {
@@ -2398,6 +2402,12 @@ function App() {
                                 <span style={{ color: 'var(--text-muted)' }}>Locus:</span>
                                 <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>Chr {extra.chromosome}: {extra.start} - {extra.end} ({extra.strand})</span>
                               </div>
+                              {details.extraMetadata?.pdbCount !== undefined && (
+                                <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>Resolved Crystals (PDB):</span>
+                                  <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{details.extraMetadata.pdbCount} structures</span>
+                                </div>
+                              )}
                               {details.extraMetadata?.pLI !== undefined && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '2px' }}>
                                   <div style={{ background: 'var(--overlay-light)', borderRadius: '6px', padding: '4px 8px', display: 'flex', flexDirection: 'column' }}>
@@ -2458,6 +2468,24 @@ function App() {
                                     <ExternalLink size={12} />
                                   </a>
                                 ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* GWAS disease traits */}
+                          {details.gwas && details.gwas.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Associated Disease Traits (GWAS)</span>
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: 'var(--text-main)', 
+                                background: 'var(--overlay-light)', 
+                                padding: '6px 10px', 
+                                borderRadius: '6px', 
+                                border: '1px solid var(--border-color)',
+                                lineHeight: 1.4
+                              }}>
+                                {Array.from(new Set(details.gwas.map(g => g.trait))).slice(0, 2).join(', ')}
                               </div>
                             </div>
                           )}
@@ -2538,6 +2566,14 @@ function App() {
                                   <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#eab308' }}>{safety.hospitalization.toLocaleString()}</span>
                                 </div>
                               </div>
+                              {safety.reactions && safety.reactions.length > 0 && (
+                                <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', padding: '2px 0' }}>
+                                  <span>Common Reactions:</span>
+                                  <span style={{ fontWeight: '500', color: 'var(--text-main)', textTransform: 'capitalize' }}>
+                                    {safety.reactions.slice(0, 2).map(r => r.term.toLowerCase()).join(', ')}
+                                  </span>
+                                </div>
+                              )}
                               <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginTop: '2px' }}>
                                 <span>FDA Reports:</span>
                                 <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>{safety.total.toLocaleString()}</span>
@@ -2559,13 +2595,14 @@ function App() {
                                 </span>
                               </div>
                               <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-                                <div style={{ width: `${details.successRates.successRate}%`, background: '#22c55e' }} title={`Completed: ${details.successRates.completed}`} />
-                                <div style={{ width: `${details.successRates.terminationRate}%`, background: '#f43f5e' }} title={`Terminated: ${details.successRates.terminated}`} />
-                                <div style={{ flex: 1, background: 'rgba(234, 179, 8, 0.3)' }} title={`Other / Suspended / Ongoing`} />
+                                <div style={{ width: `${details.successRates.total > 0 ? (details.successRates.completed / details.successRates.total) * 100 : 0}%`, background: '#22c55e' }} title={`Completed: ${details.successRates.completed}`} />
+                                <div style={{ width: `${details.successRates.total > 0 ? (details.successRates.ongoing / details.successRates.total) * 100 : 0}%`, background: 'var(--accent-secondary)' }} title={`Ongoing: ${details.successRates.ongoing}`} />
+                                <div style={{ width: `${details.successRates.total > 0 ? (details.successRates.terminated / details.successRates.total) * 100 : 0}%`, background: '#f43f5e' }} title={`Terminated: ${details.successRates.terminated}`} />
+                                <div style={{ width: `${details.successRates.total > 0 ? (details.successRates.withdrawn / details.successRates.total) * 100 : 0}%`, background: '#eab308' }} title={`Withdrawn: ${details.successRates.withdrawn}`} />
                               </div>
                               <div style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                                 <span>Total: {details.successRates.total} trials</span>
-                                <span>{details.successRates.completed} comp / {details.successRates.terminated} term</span>
+                                <span>{details.successRates.completed} C / {details.successRates.ongoing} O / {details.successRates.terminated} T / {details.successRates.withdrawn} W</span>
                               </div>
                             </div>
                           )}
@@ -3271,19 +3308,23 @@ function App() {
                                   </span>
                                 </div>
                                 <div style={{ height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
-                                  <div style={{ width: `${clinicalTrialsData.successRate}%`, background: '#22c55e' }} title={`Completed: ${clinicalTrialsData.completed}`} />
-                                  <div style={{ width: `${clinicalTrialsData.terminationRate}%`, background: '#f43f5e' }} title={`Terminated: ${clinicalTrialsData.terminated}`} />
-                                  <div style={{ flex: 1, background: 'rgba(234, 179, 8, 0.3)' }} title={`Other / Suspended / Ongoing`} />
+                                  <div style={{ width: `${clinicalTrialsData.total > 0 ? (clinicalTrialsData.completed / clinicalTrialsData.total) * 100 : 0}%`, background: '#22c55e' }} title={`Completed: ${clinicalTrialsData.completed}`} />
+                                  <div style={{ width: `${clinicalTrialsData.total > 0 ? (clinicalTrialsData.ongoing / clinicalTrialsData.total) * 100 : 0}%`, background: 'var(--accent-secondary)' }} title={`Ongoing: ${clinicalTrialsData.ongoing}`} />
+                                  <div style={{ width: `${clinicalTrialsData.total > 0 ? (clinicalTrialsData.terminated / clinicalTrialsData.total) * 100 : 0}%`, background: '#f43f5e' }} title={`Terminated: ${clinicalTrialsData.terminated}`} />
+                                  <div style={{ width: `${clinicalTrialsData.total > 0 ? (clinicalTrialsData.withdrawn / clinicalTrialsData.total) * 100 : 0}%`, background: '#eab308' }} title={`Withdrawn: ${clinicalTrialsData.withdrawn}`} />
                                 </div>
                                 <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} /> Completed Rate ({clinicalTrialsData.successRate}%)
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} /> Completed ({Math.round(clinicalTrialsData.total > 0 ? (clinicalTrialsData.completed / clinicalTrialsData.total) * 100 : 0)}%)
                                   </span>
                                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }} /> Terminated Rate ({clinicalTrialsData.terminationRate}%)
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-secondary)' }} /> Ongoing ({Math.round(clinicalTrialsData.total > 0 ? (clinicalTrialsData.ongoing / clinicalTrialsData.total) * 100 : 0)}%)
                                   </span>
                                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(234, 179, 8, 0.6)' }} /> Withdrawn/Withheld/Ongoing
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }} /> Terminated ({Math.round(clinicalTrialsData.total > 0 ? (clinicalTrialsData.terminated / clinicalTrialsData.total) * 100 : 0)}%)
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} /> Withdrawn ({Math.round(clinicalTrialsData.total > 0 ? (clinicalTrialsData.withdrawn / clinicalTrialsData.total) * 100 : 0)}%)
                                   </span>
                                 </div>
                               </div>
@@ -3298,8 +3339,25 @@ function App() {
                                     return (
                                       <div key={phase} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         <span style={{ width: '60px', fontSize: '11px', fontWeight: '500', color: 'var(--text-muted)' }}>{phase}</span>
-                                        <div style={{ flex: 1, height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                                          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-secondary)', borderRadius: '4px' }} />
+                                        <div style={{ 
+                                          flex: 1, 
+                                          height: '12px', 
+                                          background: 'var(--overlay-medium)', 
+                                          borderRadius: '6px', 
+                                          padding: '2px', 
+                                          border: '1px solid var(--border-color)',
+                                          boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.2)',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}>
+                                          <div style={{ 
+                                            width: `${pct}%`, 
+                                            height: '100%', 
+                                            background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))', 
+                                            borderRadius: '4px',
+                                            boxShadow: '0 0 8px var(--accent-primary)',
+                                            transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+                                          }} />
                                         </div>
                                         <span style={{ width: '30px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-main)', textAlign: 'right' }}>{count}</span>
                                       </div>

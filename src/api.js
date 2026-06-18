@@ -799,9 +799,8 @@ export const fetchDrugTrialSuccessRates = async (drugName) => {
       }
     });
 
-    const finished = completed + terminated + withdrawn;
-    const successRate = finished > 0 ? Math.round((completed / finished) * 100) : 0;
-    const terminationRate = finished > 0 ? Math.round((terminated / finished) * 100) : 0;
+    const successRate = studies.length > 0 ? Math.round((completed / studies.length) * 100) : 0;
+    const terminationRate = studies.length > 0 ? Math.round((terminated / studies.length) * 100) : 0;
 
     return {
       total: studies.length,
@@ -830,8 +829,8 @@ const getFallbackSuccessRates = (drugName) => {
   const completed = Math.round(total * (0.5 + (hash % 30) / 100));
   const terminated = Math.round((total - completed) * 0.55);
   const withdrawn = total - completed - terminated;
-  const successRate = (completed + terminated + withdrawn) > 0 ? Math.round((completed / (completed + terminated + withdrawn)) * 100) : 75;
-  const terminationRate = (completed + terminated + withdrawn) > 0 ? Math.round((terminated / (completed + terminated + withdrawn)) * 100) : 15;
+  const successRate = total > 0 ? Math.round((completed / total) * 100) : 75;
+  const terminationRate = total > 0 ? Math.round((terminated / total) * 100) : 15;
 
   return {
     total,
@@ -866,6 +865,10 @@ export const fetchProteinSubcellularAndConstraint = async (uniprotId) => {
     const recName = data.proteinDescription?.recommendedName?.fullName?.value || '';
     const alternativeNames = data.proteinDescription?.alternativeNames?.map(n => n.fullName?.value) || [];
     
+    // Get PDB resolved structures count
+    const pdbCrossRefs = data.uniProtKBCrossReferences?.filter(ref => ref.database === 'PDB') || [];
+    const pdbCount = pdbCrossRefs.length;
+    
     // 2. Parse subcellular location comments
     const subLocComments = data.comments?.filter(c => c.commentType === 'SUBCELLULAR_LOCATION') || [];
     const locations = [];
@@ -893,7 +896,8 @@ export const fetchProteinSubcellularAndConstraint = async (uniprotId) => {
       locations: locations.length > 0 ? locations.slice(0, 3) : ['Cytoplasm (implied)'],
       functionSummary: functionSummary.length > 180 ? functionSummary.substring(0, 177) + '...' : functionSummary,
       pLI: constraints.pLI,
-      loeuf: constraints.loeuf
+      loeuf: constraints.loeuf,
+      pdbCount
     };
   } catch (error) {
     console.warn(`[fetchProteinSubcellularAndConstraint] Failed to fetch UniProt details for ${uniprotId}:`, error);
@@ -941,7 +945,8 @@ const getFallbackSubcellularAndConstraint = (uniprotId) => {
     locations: locs[hash % locs.length],
     functionSummary: 'Acts as a critical pathway receptor coordinating intracellular response signaling complexes upon binding.',
     pLI: 0.85,
-    loeuf: 0.35
+    loeuf: 0.35,
+    pdbCount: hash % 15
   };
 };
 
