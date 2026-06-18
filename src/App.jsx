@@ -656,6 +656,83 @@ function App() {
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showGlobalMapModal, setShowGlobalMapModal] = useState(false);
 
+  // Synchronize state -> hash router
+  useEffect(() => {
+    let newHash;
+    if (activeView === 'dashboard') {
+      if (showComparison) {
+        newHash = 'compare';
+      } else if (selectedItem) {
+        newHash = `detail/${selectedItem.type}/${selectedItem.id}/${encodeURIComponent(selectedItem.name)}`;
+      } else {
+        newHash = 'dashboard';
+      }
+    } else {
+      newHash = activeView;
+    }
+    
+    if (window.location.hash !== `#${newHash}`) {
+      window.location.hash = newHash;
+    }
+  }, [activeView, showComparison, selectedItem]);
+
+  // Synchronize hash router -> state
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') || 'dashboard';
+      
+      if (hash === 'dashboard') {
+        setActiveView('dashboard');
+        setShowComparison(false);
+        setSelectedItem(null);
+      } else if (hash === 'compare') {
+        setActiveView('dashboard');
+        setShowComparison(true);
+        setSelectedItem(null);
+      } else if (hash === 'library') {
+        setActiveView('library');
+        setShowComparison(false);
+        setSelectedItem(null);
+      } else if (hash === 'trials') {
+        setActiveView('trials');
+        setShowComparison(false);
+        setSelectedItem(null);
+      } else if (hash === 'settings') {
+        setActiveView('settings');
+        setShowComparison(false);
+        setSelectedItem(null);
+      } else if (hash === 'contact') {
+        setActiveView('contact');
+        setShowComparison(false);
+        setSelectedItem(null);
+      } else if (hash.startsWith('detail/')) {
+        const parts = hash.split('/');
+        if (parts.length >= 4) {
+          const type = parts[1];
+          const id = parts[2];
+          const name = decodeURIComponent(parts[3]);
+          
+          if (!selectedItem || selectedItem.id !== id) {
+            setActiveView('dashboard');
+            setShowComparison(false);
+            setSelectedItem({
+              type,
+              id,
+              name,
+              details: type === 'Protein' ? 'Receptor target profile' : 'Therapeutic compound details',
+              status: 'Active Connection'
+            });
+          }
+        }
+      }
+    };
+
+    handleHashChange();
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [selectedItem]);
+
   // EBI Alignment Integration state
   const [selectedAlignmentJob, setSelectedAlignmentJob] = useState(null);
   const [alignmentResult, setAlignmentResult] = useState('');
