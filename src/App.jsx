@@ -368,6 +368,64 @@ function App() {
   const [activeMapRegion, setActiveMapRegion] = useState(null);
   const [sandboxSearchQuery, setSandboxSearchQuery] = useState('');
   const [sandboxShowDropdown, setSandboxShowDropdown] = useState(false);
+  const [comparisonDetails, setComparisonDetails] = useState({});
+  const [comparisonList, setComparisonList] = useState([]);
+  const [showComparison, setShowComparison] = useState(false);
+
+  useEffect(() => {
+    if (!showComparison || comparisonList.length === 0) return;
+
+    comparisonList.forEach(async (item) => {
+      if (comparisonDetails[item.id]) return;
+
+      setComparisonDetails(prev => ({
+        ...prev,
+        [item.id]: { loading: true }
+      }));
+
+      try {
+        const isTrial = item.type === 'Clinical Trial' || item.type === 'Study' || item.id.startsWith('NCT');
+        const isProtein = item.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(item.id);
+
+        const metricsPromise = fetchLiveMetrics(item);
+        let extraPromise = Promise.resolve(null);
+        let pathwaysPromise = Promise.resolve(null);
+        let safetyPromise = Promise.resolve(null);
+
+        if (isProtein) {
+          extraPromise = fetchEnsemblGenomics(item.name).catch(() => null);
+          pathwaysPromise = fetchReactomePathways(item.id).catch(() => null);
+        } else if (!isTrial) {
+          extraPromise = fetchPubChemData(item.name).catch(() => null);
+          safetyPromise = fetchFDASafetyData(item.name).catch(() => null);
+        }
+
+        const [metrics, extra, pathways, safety] = await Promise.all([
+          metricsPromise,
+          extraPromise,
+          pathwaysPromise,
+          safetyPromise
+        ]);
+
+        setComparisonDetails(prev => ({
+          ...prev,
+          [item.id]: {
+            loading: false,
+            metrics,
+            extra,
+            pathways,
+            safety
+          }
+        }));
+      } catch (err) {
+        console.warn("Failed to fetch details for comparison item:", item.id, err);
+        setComparisonDetails(prev => ({
+          ...prev,
+          [item.id]: { loading: false, error: true }
+        }));
+      }
+    });
+  }, [comparisonList, showComparison, comparisonDetails]);
 
   const addRecentSearch = (query) => {
     if (!query || query.trim().length < 2) return;
@@ -564,8 +622,6 @@ function App() {
     return () => clearTimeout(delayDebounceFn);
   }, [sandboxSmiles]);
 
-  const [comparisonList, setComparisonList] = useState([]);
-  const [showComparison, setShowComparison] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
   const [showProfile, setShowProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -852,25 +908,109 @@ function App() {
   const handleExportComparisonCSV = () => {
     if (comparisonList.length === 0) return;
     
-    const headers = ['Name', 'ID', 'Category', 'Status', 'Details', 'IC50 (nM)', 'Ki (nM)', 'Efficiency'];
+    const headers = [
+      'Name', 
+      'ID', 
+      'Category', 
+      'Primary Info', 
+      'Median IC50 / Enrollment', 
+      'Median Ki / Phase', 
+      'Assay Count / Completion Date',
+      'Mol. Weight',
+      'LogP',
+      'H-Bond Donors',
+      'H-Bond Acceptors',
+      'Chemical Formula',
+      'SMILES String',
+      'Lipinski Compliance',
+      'FDA Safety Total Events',
+      'FDA Safety Deaths',
+      'FDA Safety Hospitalizations',
+      'Genomic Locus (Chr)',
+      'Genomic Coordinates (Start-End)',
+      'Associated Reactome Pathways'
+    ];
     
-    const rows = comparisonList.map(item => [
-      item.name || '',
-      item.id || '',
-      item.type || '',
-      item.status || 'Verified Integration',
-      `"${(item.details || '').replace(/"/g, '""')}"`,
-      '1.2',
-      '0.85',
-      '0.68'
-    ]);
+    const rows = comparisonList.map(item => {
+      const details = comparisonDetails[item.id] || {};
+      const metrics = details.metrics || {};
+      const extra = details.extra || {};
+      const safety = details.safety || {};
+      const pathways = details.pathways || [];
+      
+      let weight = 'N/A';
+      let logP = 'N/A';
+      let donors = 'N/A';
+      let acceptors = 'N/A';
+      let formula = 'N/A';
+      let smiles = 'N/A';
+      let lipinski = 'N/A';
+      let fdaTotal = 'N/A';
+      let fdaDeaths = 'N/A';
+      let fdaHosp = 'N/A';
+      let chromosome = 'N/A';
+      let coords = 'N/A';
+      let pathwaysStr = 'N/A';
+      
+      const isProtein = item.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(item.id);
+      
+      if (!isProtein && item.type !== 'Clinical Trial' && item.type !== 'Study') {
+        if (extra.weight) {
+          weight = `${extra.weight.toFixed(1)} Da`;
+          logP = extra.logP !== null ? extra.logP.toFixed(2) : 'N/A';
+          donors = extra.donors !== undefined ? extra.donors : 0;
+          acceptors = extra.acceptors !== undefined ? extra.acceptors : 0;
+          formula = extra.formula || 'N/A';
+          smiles = extra.smiles || 'N/A';
+          const isCompliant = extra.weight <= 500 && (extra.logP === null || extra.logP <= 5) && extra.donors <= 5 && extra.acceptors <= 10;
+          lipinski = isCompliant ? 'Compliant' : 'Non-compliant';
+        }
+        if (safety.total) {
+          fdaTotal = safety.total.toString();
+          fdaDeaths = safety.death.toString();
+          fdaHosp = safety.hospitalization.toString();
+        }
+      } else if (isProtein) {
+        if (extra.chromosome) {
+          chromosome = extra.chromosome;
+          coords = `${extra.start} - ${extra.end} (${extra.strand})`;
+        }
+        if (pathways.length > 0) {
+          pathwaysStr = pathways.map(p => p.name).join('; ');
+        }
+      }
+      
+      return [
+        item.name || '',
+        item.id || '',
+        item.type || '',
+        item.details || '',
+        metrics.value1 || 'N/A',
+        metrics.value2 || 'N/A',
+        metrics.value3 || 'N/A',
+        weight,
+        logP,
+        donors,
+        acceptors,
+        formula,
+        smiles,
+        lipinski,
+        fdaTotal,
+        fdaDeaths,
+        fdaHosp,
+        chromosome,
+        coords,
+        pathwaysStr
+      ];
+    });
     
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.join(','))
-    ].join('\n');
-    
-    handleDownloadFile(csvContent, `AURA_Comparison_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+    downloadCSV(`AURA_Comparison_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
+  };
+
+  const handleCopySmiles = (smiles) => {
+    if (!smiles) return;
+    navigator.clipboard.writeText(smiles);
+    addNotification('Copied SMILES', 'SMILES string copied to clipboard.', 'info');
   };
 
   // Fetch alignment text results from EBI backend handler
@@ -1366,6 +1506,7 @@ function App() {
     setSelectedItem(null);
     setShowComparison(false);
     setComparisonList([]);
+    setComparisonDetails({});
     setResults(null);
     setSearchQuery('');
     setSidebarOpen(false);
@@ -1391,6 +1532,11 @@ function App() {
 
   const removeFromComparison = (id) => {
     setComparisonList(comparisonList.filter(i => i.id !== id));
+    setComparisonDetails(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
   };
 
   useEffect(() => {
@@ -2050,30 +2196,292 @@ function App() {
               </header>
 
               <div className="comparison-grid">
-                {comparisonList.map((item) => (
-                  <div key={item.id} className="glass-card comparison-card">
-                    <button 
-                      className="remove-btn"
-                      onClick={() => removeFromComparison(item.id)}
-                    >
-                      ×
-                    </button>
-                    <span className="badge">{item.type}</span>
-                    <h3>{item.name}</h3>
-                    <p className="id-tag">{item.id}</p>
-                    
-                    <div className="compare-details">
-                      <div className="compare-row">
-                        <label>Category</label>
-                        <span>{item.type}</span>
+                {comparisonList.map((item) => {
+                  const details = comparisonDetails[item.id] || {};
+                  const isProtein = item.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(item.id);
+                  const isTrial = item.type === 'Clinical Trial' || item.type === 'Study' || item.id.startsWith('NCT');
+
+                  if (details.loading) {
+                    return (
+                      <div key={item.id} className="glass-card comparison-card loading-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '480px', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                        <button 
+                          className="remove-btn"
+                          onClick={() => removeFromComparison(item.id)}
+                        >
+                          ×
+                        </button>
+                        <div className="shimmer-loader" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                          <Loader2 className="animate-spin" style={{ color: 'var(--accent-primary)' }} size={32} />
+                          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading live target insights...</p>
+                        </div>
                       </div>
-                      <div className="compare-row">
-                        <label>Primary Info</label>
-                        <p>{item.details}</p>
+                    );
+                  }
+
+                  if (details.error) {
+                    return (
+                      <div key={item.id} className="glass-card comparison-card error-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '480px', justifyContent: 'center', alignItems: 'center', padding: '24px', textAlign: 'center', position: 'relative' }}>
+                        <button 
+                          className="remove-btn"
+                          onClick={() => removeFromComparison(item.id)}
+                        >
+                          ×
+                        </button>
+                        <p style={{ color: '#f43f5e', fontSize: '14px', marginBottom: '8px' }}>Failed to retrieve data.</p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Check network connection or try search again.</p>
+                      </div>
+                    );
+                  }
+
+                  const metrics = details.metrics || {};
+                  const extra = details.extra || {};
+                  const pathways = details.pathways || [];
+                  const safety = details.safety || null;
+
+                  // Evaluate Lipinski rules if drug
+                  let lipinskiPassCount = 0;
+                  let lipinskiRules = [];
+                  if (!isTrial && !isProtein && extra.weight !== undefined) {
+                    const wPass = extra.weight <= 500;
+                    const lPass = extra.logP === null || extra.logP <= 5;
+                    const dPass = extra.donors <= 5;
+                    const aPass = extra.acceptors <= 10;
+                    
+                    lipinskiRules = [
+                      { label: 'Mol. Weight (≤ 500 Da)', val: `${extra.weight.toFixed(1)} Da`, pass: wPass },
+                      { label: 'LogP (≤ 5)', val: extra.logP !== null ? extra.logP.toFixed(2) : 'N/A', pass: lPass },
+                      { label: 'H-Bond Donors (≤ 5)', val: extra.donors, pass: dPass },
+                      { label: 'H-Bond Acceptors (≤ 10)', val: extra.acceptors, pass: aPass }
+                    ];
+                    lipinskiPassCount = lipinskiRules.filter(r => r.pass).length;
+                  }
+
+                  return (
+                    <div key={item.id} className={`glass-card comparison-card ${isProtein ? 'compare-protein' : 'compare-drug'}`} style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '480px', position: 'relative', border: `1px solid ${isProtein ? 'rgba(124, 58, 237, 0.2)' : 'rgba(8, 145, 178, 0.2)'}` }}>
+                      <button 
+                        className="remove-btn"
+                        onClick={() => removeFromComparison(item.id)}
+                        title="Remove from comparison"
+                      >
+                        ×
+                      </button>
+                      
+                      {/* Header Section */}
+                      <div>
+                        <span className={`badge ${isProtein ? 'protein-badge' : 'drug-badge'}`} style={{
+                          background: isProtein ? 'rgba(124, 58, 237, 0.1)' : 'rgba(8, 145, 178, 0.1)',
+                          color: isProtein ? 'var(--accent-primary)' : 'var(--accent-secondary)',
+                          border: `1px solid ${isProtein ? 'rgba(124, 58, 237, 0.2)' : 'rgba(8, 145, 178, 0.2)'}`,
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          display: 'inline-block',
+                          marginBottom: '8px'
+                        }}>
+                          {item.type}
+                        </span>
+                        <h3 style={{ fontSize: '18px', fontWeight: '600', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.id}</span>
+                      </div>
+
+                      {/* Primary Metrics Row (Pharmacokinetics/Bioactivity) */}
+                      <div style={{ background: 'var(--overlay-light)', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pharmacological Profile</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
+                          <div>
+                            <span style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{metrics.label1 || 'Metric 1'}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{metrics.value1 || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{metrics.label2 || 'Metric 2'}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{metrics.value2 || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{metrics.label3 || 'Metric 3'}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{metrics.value3 || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Protein genomic locus & pathways list */}
+                      {isProtein && (
+                        <>
+                          {/* Genomics info */}
+                          {extra.chromosome && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Genomic Locus (Ensembl)</span>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Chromosome:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>Chr {extra.chromosome}</span>
+                              </div>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Coordinates:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)', fontFamily: 'monospace' }}>{extra.start} - {extra.end} ({extra.strand})</span>
+                              </div>
+                              {extra.transcripts && extra.transcripts.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'bold' }}>Splice Transcripts:</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    {extra.transcripts.slice(0, 2).map(t => (
+                                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', background: 'var(--overlay-light)', padding: '4px 6px', borderRadius: '4px' }}>
+                                        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }} title={t.name}>{t.name}</span>
+                                        <span style={{ color: 'var(--text-main)' }}>{t.length} bp ({t.biotype.split('_')[0]})</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Reactome pathways */}
+                          {pathways && pathways.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Target Pathways (Reactome)</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {pathways.slice(0, 2).map(p => (
+                                  <a 
+                                    key={p.id} 
+                                    href={p.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'space-between', 
+                                      fontSize: '11px', 
+                                      color: 'var(--accent-primary)', 
+                                      textDecoration: 'none',
+                                      background: 'rgba(124, 58, 237, 0.06)',
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(124, 58, 237, 0.1)'
+                                    }}
+                                  >
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{p.name}</span>
+                                    <ExternalLink size={12} />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Drug Lipinski checklist & openFDA safety metrics */}
+                      {!isProtein && !isTrial && (
+                        <>
+                          {/* Chemical Formula / SMILES */}
+                          {extra.formula && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Chemical Identity</span>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Formula:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>{extra.formula}</span>
+                              </div>
+                              {extra.smiles && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--overlay-light)', borderRadius: '4px', padding: '4px 6px', marginTop: '2px' }}>
+                                  <span style={{ fontSize: '10px', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px', color: 'var(--text-muted)' }} title={extra.smiles}>{extra.smiles}</span>
+                                  <button 
+                                    onClick={() => handleCopySmiles(extra.smiles)}
+                                    style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)' }}
+                                    title="Copy SMILES to clipboard"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Lipinski checklist */}
+                          {extra.weight !== undefined && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Lipinski Compliance</span>
+                                <span style={{
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  background: lipinskiPassCount === 4 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(234, 179, 8, 0.1)',
+                                  color: lipinskiPassCount === 4 ? '#22c55e' : '#eab308',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}>
+                                  {lipinskiPassCount}/4 Passed
+                                </span>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                {lipinskiRules.map((r, idx) => (
+                                  <div key={idx} style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    padding: '4px 8px', 
+                                    borderRadius: '6px', 
+                                    background: r.pass ? 'rgba(34, 197, 94, 0.03)' : 'rgba(244, 63, 94, 0.03)',
+                                    border: `1px solid ${r.pass ? 'rgba(34, 197, 94, 0.08)' : 'rgba(244, 63, 94, 0.08)'}` 
+                                  }}>
+                                    <span style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label.split(' ')[0]}</span>
+                                    <span style={{ fontSize: '11px', fontWeight: '500', color: r.pass ? 'var(--text-main)' : '#f43f5e' }}>{r.val}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* openFDA Safety metrics */}
+                          {safety && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>FDA Safety Analytics</span>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', textAlign: 'center' }}>
+                                <div style={{ background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.1)', borderRadius: '6px', padding: '6px' }}>
+                                  <span style={{ display: 'block', fontSize: '9px', color: '#f43f5e', fontWeight: '500' }}>Serious Deaths</span>
+                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#f43f5e' }}>{safety.death.toLocaleString()}</span>
+                                </div>
+                                <div style={{ background: 'rgba(234, 179, 8, 0.04)', border: '1px solid rgba(234, 179, 8, 0.1)', borderRadius: '6px', padding: '6px' }}>
+                                  <span style={{ display: 'block', fontSize: '9px', color: '#eab308', fontWeight: '500' }}>Hospitalizations</span>
+                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#eab308' }}>{safety.hospitalization.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                <span>FDA Reports:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>{safety.total.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* View Details Action Button */}
+                      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button 
+                          className="primary-button" 
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setShowComparison(false);
+                          }}
+                          style={{ 
+                            width: '100%', 
+                            background: isProtein ? 'var(--accent-primary)' : 'var(--accent-secondary)', 
+                            color: 'white',
+                            fontSize: '12px',
+                            padding: '8px',
+                            height: 'auto',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <span>View Complete Insights</span>
+                          <ChevronRight size={14} />
+                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {comparisonList.length < 4 && (
                   <div className="glass-card add-more-placeholder">
                     <Search size={32} />
