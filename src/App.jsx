@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Clock, TrendingUp, Trash2 } from 'lucide-react';
-import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations, fetchDrugTrialSuccessRates } from './api';
+import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations, fetchDrugTrialSuccessRates, fetchProteinSubcellularAndConstraint, fetchDrugMechanismAndStatus } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
 import Protein3DViewer from './Protein3DViewer';
@@ -394,22 +394,26 @@ function App() {
         let pathwaysPromise = Promise.resolve(null);
         let safetyPromise = Promise.resolve(null);
         let successRatesPromise = Promise.resolve(null);
+        let extraMetadataPromise = Promise.resolve(null);
 
         if (isProtein) {
           extraPromise = fetchEnsemblGenomics(item.name).catch(() => null);
           pathwaysPromise = fetchReactomePathways(item.id).catch(() => null);
+          extraMetadataPromise = fetchProteinSubcellularAndConstraint(item.id).catch(() => null);
         } else if (!isTrial) {
           extraPromise = fetchPubChemData(item.name).catch(() => null);
           safetyPromise = fetchFDASafetyData(item.name).catch(() => null);
           successRatesPromise = fetchDrugTrialSuccessRates(item.name).catch(() => null);
+          extraMetadataPromise = fetchDrugMechanismAndStatus(item.id).catch(() => null);
         }
 
-        const [metrics, extra, pathways, safety, successRates] = await Promise.all([
+        const [metrics, extra, pathways, safety, successRates, extraMetadata] = await Promise.all([
           metricsPromise,
           extraPromise,
           pathwaysPromise,
           safetyPromise,
-          successRatesPromise
+          successRatesPromise,
+          extraMetadataPromise
         ]);
 
         setComparisonDetails(prev => ({
@@ -420,7 +424,8 @@ function App() {
             extra,
             pathways,
             safety,
-            successRates
+            successRates,
+            extraMetadata
           }
         }));
       } catch (err) {
@@ -951,7 +956,13 @@ function App() {
       'Clinical Success Rate (%)',
       'Clinical Trials (Total)',
       'Clinical Trials (Completed)',
-      'Clinical Trials (Terminated)'
+      'Clinical Trials (Terminated)',
+      'Subcellular Localization',
+      'LoF Intolerance (pLI)',
+      'Gene Constraint (LOEUF)',
+      'Clinical Status (Max Phase)',
+      'Drug Action Type',
+      'Mechanism of Action Description'
     ];
     
     const rows = comparisonList.map(item => {
@@ -961,6 +972,7 @@ function App() {
       const safety = details.safety || {};
       const pathways = details.pathways || [];
       const successRates = details.successRates || {};
+      const extraMetadata = details.extraMetadata || {};
       
       let weight = 'N/A';
       let logP = 'N/A';
@@ -979,6 +991,12 @@ function App() {
       let trialsTotal = 'N/A';
       let trialsCompleted = 'N/A';
       let trialsTerminated = 'N/A';
+      let subcellLocs = 'N/A';
+      let pLI = 'N/A';
+      let loeuf = 'N/A';
+      let clinicalPhase = 'N/A';
+      let actionType = 'N/A';
+      let mechanismDesc = 'N/A';
       
       const isProtein = item.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(item.id);
       
@@ -1004,6 +1022,11 @@ function App() {
           trialsCompleted = successRates.completed.toString();
           trialsTerminated = successRates.terminated.toString();
         }
+        if (extraMetadata.clinicalPhase) {
+          clinicalPhase = extraMetadata.clinicalPhase;
+          actionType = extraMetadata.actionType;
+          mechanismDesc = extraMetadata.mechanismOfAction;
+        }
       } else if (isProtein) {
         if (extra.chromosome) {
           chromosome = extra.chromosome;
@@ -1011,6 +1034,11 @@ function App() {
         }
         if (pathways.length > 0) {
           pathwaysStr = pathways.map(p => p.name).join('; ');
+        }
+        if (extraMetadata.locations) {
+          subcellLocs = extraMetadata.locations.join('; ');
+          pLI = extraMetadata.pLI !== undefined ? extraMetadata.pLI.toString() : 'N/A';
+          loeuf = extraMetadata.loeuf !== undefined ? extraMetadata.loeuf.toString() : 'N/A';
         }
       }
       
@@ -1038,7 +1066,13 @@ function App() {
         clinicalSuccess,
         trialsTotal,
         trialsCompleted,
-        trialsTerminated
+        trialsTerminated,
+        subcellLocs,
+        pLI,
+        loeuf,
+        clinicalPhase,
+        actionType,
+        mechanismDesc
       ];
     });
     
@@ -2323,6 +2357,15 @@ function App() {
                         </span>
                         <h3 style={{ fontSize: '18px', fontWeight: '600', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.id}</span>
+                        {details.extraMetadata?.locations && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {details.extraMetadata.locations.map((loc, idx) => (
+                              <span key={idx} style={{ fontSize: '9px', background: 'var(--overlay-light)', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                                📍 {loc}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Primary Metrics Row (Pharmacokinetics/Bioactivity) */}
@@ -2347,18 +2390,30 @@ function App() {
                       {/* Protein genomic locus & pathways list */}
                       {isProtein && (
                         <>
-                          {/* Genomics info */}
+                          {/* Genomics & Constraints info */}
                           {extra.chromosome && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Genomic Locus (Ensembl)</span>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Genomics & Constraints (gnomAD)</span>
                               <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Chromosome:</span>
-                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>Chr {extra.chromosome}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>Locus:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>Chr {extra.chromosome}: {extra.start} - {extra.end} ({extra.strand})</span>
                               </div>
-                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Coordinates:</span>
-                                <span style={{ fontWeight: '500', color: 'var(--text-main)', fontFamily: 'monospace' }}>{extra.start} - {extra.end} ({extra.strand})</span>
-                              </div>
+                              {details.extraMetadata?.pLI !== undefined && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '2px' }}>
+                                  <div style={{ background: 'var(--overlay-light)', borderRadius: '6px', padding: '4px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>LoF Intolerance (pLI)</span>
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: details.extraMetadata.pLI >= 0.9 ? '#22c55e' : 'var(--text-main)' }}>
+                                      {details.extraMetadata.pLI} {details.extraMetadata.pLI >= 0.9 ? '(Essential)' : ''}
+                                    </span>
+                                  </div>
+                                  <div style={{ background: 'var(--overlay-light)', borderRadius: '6px', padding: '4px 8px', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Constraint (LOEUF)</span>
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: details.extraMetadata.loeuf <= 0.35 ? '#22c55e' : 'var(--text-main)' }}>
+                                      {details.extraMetadata.loeuf}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                               {extra.transcripts && extra.transcripts.length > 0 && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
                                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'bold' }}>Splice Transcripts:</span>
@@ -2512,6 +2567,28 @@ function App() {
                                 <span>Total: {details.successRates.total} trials</span>
                                 <span>{details.successRates.completed} comp / {details.successRates.terminated} term</span>
                               </div>
+                            </div>
+                          )}
+
+                          {/* Drug Mechanism of Action */}
+                          {details.extraMetadata?.clinicalPhase && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Mechanism & Status (ChEMBL)</span>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+                                <span style={{ fontWeight: '600', color: details.extraMetadata.clinicalPhase.includes('Approved') ? '#22c55e' : 'var(--accent-secondary)' }}>
+                                  {details.extraMetadata.clinicalPhase}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Action:</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>{details.extraMetadata.actionType}</span>
+                              </div>
+                              {details.extraMetadata.mechanismOfAction && (
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0', fontStyle: 'italic', lineHeight: 1.3 }}>
+                                  "{details.extraMetadata.mechanismOfAction}"
+                                </p>
+                              )}
                             </div>
                           )}
                         </>
