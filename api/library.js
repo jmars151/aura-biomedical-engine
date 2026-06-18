@@ -2,21 +2,86 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'api', 'library_db.json');
+const KV_URL = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
-// Helper to read database
-async function readDb() {
+// Check if Vercel KV is configured
+const isKvConfigured = () => !!(KV_URL && KV_TOKEN);
+
+// Read user data from KV or local JSON file
+async function readUserData(email) {
+  const key = `aura_user:${email}`;
+  
+  if (isKvConfigured()) {
+    try {
+      const response = await fetch(KV_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KV_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(['GET', key])
+      });
+      
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.result) {
+          return JSON.parse(resJson.result);
+        }
+      }
+    } catch (err) {
+      console.error('Error reading from Vercel KV cloud:', err);
+    }
+  }
+
+  // Fallback to local file database
   try {
     const content = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(content);
+    const db = JSON.parse(content);
+    return db[email] || null;
   } catch (error) {
-    // If file does not exist, return empty database object
-    return {};
+    return null;
   }
 }
 
-// Helper to write database
-async function writeDb(data) {
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+// Write user data to KV or local JSON file
+async function writeUserData(email, data) {
+  const key = `aura_user:${email}`;
+
+  if (isKvConfigured()) {
+    try {
+      const response = await fetch(KV_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KV_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(['SET', key, JSON.stringify(data)])
+      });
+      
+      if (response.ok) {
+        return;
+      }
+    } catch (err) {
+      console.error('Error writing to Vercel KV cloud:', err);
+    }
+  }
+
+  // Fallback to local file database
+  try {
+    let db = {};
+    try {
+      const content = await fs.readFile(DB_PATH, 'utf-8');
+      db = JSON.parse(content);
+    } catch (e) {
+      // Ignore read error, start with empty database
+    }
+    
+    db[email] = data;
+    await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error writing to local database file:', err);
+  }
 }
 
 export default async function handler(req, res) {
@@ -41,8 +106,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ status: 'error', message: 'Email query parameter is required' });
       }
 
-      const db = await readDb();
-      const userData = db[email] || null;
+      const userData = await readUserData(email);
 
       return res.status(200).json({
         status: 'success',
@@ -56,8 +120,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ status: 'error', message: 'Email body parameter is required' });
       }
 
-      const db = await readDb();
-      db[email] = {
+      const userData = {
         libraryItems: libraryItems || [],
         glassmorphismIntensity: glassmorphismIntensity ?? 80,
         darkMode: darkMode ?? true,
@@ -66,7 +129,7 @@ export default async function handler(req, res) {
         updatedAt: new Date().toISOString()
       };
 
-      await writeDb(db);
+      await writeUserData(email, userData);
 
       return res.status(200).json({
         status: 'success',
