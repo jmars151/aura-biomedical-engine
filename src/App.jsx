@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Clock, TrendingUp, Trash2 } from 'lucide-react';
-import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations } from './api';
+import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations, fetchDrugTrialSuccessRates } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
 import Protein3DViewer from './Protein3DViewer';
@@ -354,6 +354,8 @@ function App() {
   const [gtexLoading, setGtexLoading] = useState(false);
   const [gwasData, setGwasData] = useState([]);
   const [gwasLoading, setGwasLoading] = useState(false);
+  const [clinicalTrialsData, setClinicalTrialsData] = useState(null);
+  const [clinicalTrialsLoading, setClinicalTrialsLoading] = useState(false);
 
   // Search Autocomplete, CSV Exports, Map Highlighting, SMILES Sandbox Upgrades
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -391,6 +393,7 @@ function App() {
         let extraPromise = Promise.resolve(null);
         let pathwaysPromise = Promise.resolve(null);
         let safetyPromise = Promise.resolve(null);
+        let successRatesPromise = Promise.resolve(null);
 
         if (isProtein) {
           extraPromise = fetchEnsemblGenomics(item.name).catch(() => null);
@@ -398,13 +401,15 @@ function App() {
         } else if (!isTrial) {
           extraPromise = fetchPubChemData(item.name).catch(() => null);
           safetyPromise = fetchFDASafetyData(item.name).catch(() => null);
+          successRatesPromise = fetchDrugTrialSuccessRates(item.name).catch(() => null);
         }
 
-        const [metrics, extra, pathways, safety] = await Promise.all([
+        const [metrics, extra, pathways, safety, successRates] = await Promise.all([
           metricsPromise,
           extraPromise,
           pathwaysPromise,
-          safetyPromise
+          safetyPromise,
+          successRatesPromise
         ]);
 
         setComparisonDetails(prev => ({
@@ -414,7 +419,8 @@ function App() {
             metrics,
             extra,
             pathways,
-            safety
+            safety,
+            successRates
           }
         }));
       } catch (err) {
@@ -460,6 +466,7 @@ function App() {
         setEnsemblData(null);
         setGtexData([]);
         setGwasData([]);
+        setClinicalTrialsData(null);
       });
     }
   }, [selectedItem]);
@@ -592,7 +599,19 @@ function App() {
         });
       });
     }
-  }, [selectedItem, activeDetailTab, fdaSafetyData, pubChemData, reactomePathways.length, publicationsData.length, ensemblData, gtexData.length, gwasData.length]);
+
+    if (activeDetailTab === 'clinical' && !isProtein && !clinicalTrialsData) {
+      Promise.resolve().then(() => {
+        setClinicalTrialsLoading(true);
+      });
+      fetchDrugTrialSuccessRates(drugName).then(data => {
+        Promise.resolve().then(() => {
+          setClinicalTrialsData(data);
+          setClinicalTrialsLoading(false);
+        });
+      });
+    }
+  }, [selectedItem, activeDetailTab, fdaSafetyData, pubChemData, reactomePathways.length, publicationsData.length, ensemblData, gtexData.length, gwasData.length, clinicalTrialsData]);
 
   // SMILES sandbox debounce property loader
   useEffect(() => {
@@ -928,7 +947,11 @@ function App() {
       'FDA Safety Hospitalizations',
       'Genomic Locus (Chr)',
       'Genomic Coordinates (Start-End)',
-      'Associated Reactome Pathways'
+      'Associated Reactome Pathways',
+      'Clinical Success Rate (%)',
+      'Clinical Trials (Total)',
+      'Clinical Trials (Completed)',
+      'Clinical Trials (Terminated)'
     ];
     
     const rows = comparisonList.map(item => {
@@ -937,6 +960,7 @@ function App() {
       const extra = details.extra || {};
       const safety = details.safety || {};
       const pathways = details.pathways || [];
+      const successRates = details.successRates || {};
       
       let weight = 'N/A';
       let logP = 'N/A';
@@ -951,6 +975,10 @@ function App() {
       let chromosome = 'N/A';
       let coords = 'N/A';
       let pathwaysStr = 'N/A';
+      let clinicalSuccess = 'N/A';
+      let trialsTotal = 'N/A';
+      let trialsCompleted = 'N/A';
+      let trialsTerminated = 'N/A';
       
       const isProtein = item.type === 'Protein' || /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(item.id);
       
@@ -969,6 +997,12 @@ function App() {
           fdaTotal = safety.total.toString();
           fdaDeaths = safety.death.toString();
           fdaHosp = safety.hospitalization.toString();
+        }
+        if (successRates.total) {
+          clinicalSuccess = `${successRates.successRate}%`;
+          trialsTotal = successRates.total.toString();
+          trialsCompleted = successRates.completed.toString();
+          trialsTerminated = successRates.terminated.toString();
         }
       } else if (isProtein) {
         if (extra.chromosome) {
@@ -1000,7 +1034,11 @@ function App() {
         fdaHosp,
         chromosome,
         coords,
-        pathwaysStr
+        pathwaysStr,
+        clinicalSuccess,
+        trialsTotal,
+        trialsCompleted,
+        trialsTerminated
       ];
     });
     
@@ -2451,6 +2489,31 @@ function App() {
                               </div>
                             </div>
                           )}
+
+                          {/* Clinical Trials Success Rates */}
+                          {details.successRates && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 'bold' }}>Clinical Trial Outcomes</span>
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  color: details.successRates.successRate >= 70 ? '#22c55e' : (details.successRates.successRate >= 40 ? '#eab308' : '#f43f5e')
+                                }}>
+                                  {details.successRates.successRate}% Success
+                                </span>
+                              </div>
+                              <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+                                <div style={{ width: `${details.successRates.successRate}%`, background: '#22c55e' }} title={`Completed: ${details.successRates.completed}`} />
+                                <div style={{ width: `${details.successRates.terminationRate}%`, background: '#f43f5e' }} title={`Terminated: ${details.successRates.terminated}`} />
+                                <div style={{ flex: 1, background: 'rgba(234, 179, 8, 0.3)' }} title={`Other / Suspended / Ongoing`} />
+                              </div>
+                              <div style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                                <span>Total: {details.successRates.total} trials</span>
+                                <span>{details.successRates.completed} comp / {details.successRates.terminated} term</span>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -2637,6 +2700,12 @@ function App() {
                             onClick={() => setActiveDetailTab('cheminformatics')}
                           >
                             Cheminformatics & SMILES
+                          </button>
+                          <button 
+                            className={`detail-tab-btn ${activeDetailTab === 'clinical' ? 'active' : ''}`}
+                            onClick={() => setActiveDetailTab('clinical')}
+                          >
+                            Clinical Trials & Success Rates
                           </button>
                           <button 
                             className={`detail-tab-btn ${activeDetailTab === 'publications' ? 'active' : ''}`}
@@ -3074,6 +3143,95 @@ function App() {
                                 </div>
                               </div>
                             </>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 3.5 (Drug): Clinical Trials & Success Rates */}
+                    {selectedItem.type !== 'Protein' && activeDetailTab === 'clinical' && (
+                      <div className="clinical-trials-tab-layout animate-fade-in glass-card" style={{ padding: '24px' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)', margin: '0 0 4px 0' }}>Clinical Trial Analytics</h3>
+                        <p className="subtitle" style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                          Aggregated outcomes and completion rates from ClinicalTrials.gov registry
+                        </p>
+                        
+                        {clinicalTrialsLoading ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px' }}>
+                            <Loader2 className="animate-spin" size={32} style={{ color: 'var(--accent-secondary)' }} />
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '12px' }}>Analyzing drug trials registry data...</p>
+                          </div>
+                        ) : (
+                          clinicalTrialsData && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                              
+                              {/* Big Stats Row */}
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                                <div style={{ background: 'var(--overlay-light)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
+                                  <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>Total Registered Trials</span>
+                                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>{clinicalTrialsData.total}</span>
+                                </div>
+                                <div style={{ background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.1)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
+                                  <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e', marginBottom: '6px' }}>Success (Completed)</span>
+                                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#22c55e' }}>{clinicalTrialsData.completed}</span>
+                                </div>
+                                <div style={{ background: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.1)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
+                                  <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f43f5e', marginBottom: '6px' }}>Terminated / Halted</span>
+                                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#f43f5e' }}>{clinicalTrialsData.terminated}</span>
+                                </div>
+                                <div style={{ background: 'rgba(8, 145, 178, 0.05)', border: '1px solid rgba(8, 145, 178, 0.1)', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
+                                  <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-secondary)', marginBottom: '6px' }}>Active / Ongoing</span>
+                                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--accent-secondary)' }}>{clinicalTrialsData.ongoing}</span>
+                                </div>
+                              </div>
+
+                              {/* Progress bar / Ring style success rates */}
+                              <div style={{ background: 'var(--overlay-light)', padding: '20px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>Clinical Completion & Progression Success Rate</h4>
+                                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: clinicalTrialsData.successRate >= 70 ? '#22c55e' : (clinicalTrialsData.successRate >= 40 ? '#eab308' : '#f43f5e') }}>
+                                    {clinicalTrialsData.successRate}%
+                                  </span>
+                                </div>
+                                <div style={{ height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
+                                  <div style={{ width: `${clinicalTrialsData.successRate}%`, background: '#22c55e' }} title={`Completed: ${clinicalTrialsData.completed}`} />
+                                  <div style={{ width: `${clinicalTrialsData.terminationRate}%`, background: '#f43f5e' }} title={`Terminated: ${clinicalTrialsData.terminated}`} />
+                                  <div style={{ flex: 1, background: 'rgba(234, 179, 8, 0.3)' }} title={`Other / Suspended / Ongoing`} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} /> Completed Rate ({clinicalTrialsData.successRate}%)
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f43f5e' }} /> Terminated Rate ({clinicalTrialsData.terminationRate}%)
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(234, 179, 8, 0.6)' }} /> Withdrawn/Withheld/Ongoing
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Phase Breakdown */}
+                              <div>
+                                <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', margin: '0 0 12px 0' }}>Trial Breakdown by Phase</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {Object.entries(clinicalTrialsData.phases).map(([phase, count]) => {
+                                    const maxCount = Math.max(...Object.values(clinicalTrialsData.phases)) || 1;
+                                    const pct = Math.round((count / maxCount) * 100);
+                                    return (
+                                      <div key={phase} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ width: '60px', fontSize: '11px', fontWeight: '500', color: 'var(--text-muted)' }}>{phase}</span>
+                                        <div style={{ flex: 1, height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                                          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-secondary)', borderRadius: '4px' }} />
+                                        </div>
+                                        <span style={{ width: '30px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-main)', textAlign: 'right' }}>{count}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                            </div>
                           )
                         )}
                       </div>
