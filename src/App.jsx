@@ -1354,21 +1354,27 @@ function App() {
   // Sync state on user change
   useEffect(() => {
     if (!currentUser) {
+      console.log('[DEBUG] Sync state on user change: no currentUser, returning early.');
       return;
     }
     
     let isMounted = true;
     const userKey = `aura_user_data_${currentUser.email}`;
+    console.log('[DEBUG] Sync state on user change triggered for:', currentUser.email, 'userKey:', userKey);
     
     async function syncUserData() {
       try {
+        console.log('[DEBUG] syncUserData: Fetching from server...');
         const response = await fetch(`/api/library?email=${encodeURIComponent(currentUser.email)}`);
+        console.log('[DEBUG] syncUserData: Fetch response status:', response.status);
         if (!response.ok) throw new Error('Failed to fetch from server');
         const resJson = await response.json();
+        console.log('[DEBUG] syncUserData: Server response JSON:', resJson);
         
         if (isMounted) {
           if (resJson.status === 'success' && resJson.data) {
             const data = resJson.data;
+            console.log('[DEBUG] syncUserData: Success, setting state from server data:', data);
             setLibraryItems(data.libraryItems || []);
             setGlassmorphismIntensity(data.glassmorphismIntensity ?? 80);
             setDarkMode(data.darkMode ?? true);
@@ -1383,8 +1389,10 @@ function App() {
             localStorage.setItem(userKey, JSON.stringify(data));
           } else {
             // No data on server, check local storage
+            console.log('[DEBUG] syncUserData: No data on server (null). Checking localStorage...');
             const savedData = localStorage.getItem(userKey);
             if (savedData) {
+              console.log('[DEBUG] syncUserData: Found data in localStorage, parsing and setting:', savedData);
               const parsed = JSON.parse(savedData);
               setLibraryItems(parsed.libraryItems || []);
               setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1396,6 +1404,7 @@ function App() {
               setNotifications(parsed.notifications || []);
               
               // Push local storage data to server
+              console.log('[DEBUG] syncUserData: Pushing localStorage data to server...');
               await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1406,6 +1415,7 @@ function App() {
               });
             } else {
               // Create default settings
+              console.log('[DEBUG] syncUserData: No localStorage data found. Seeding defaults...');
               const defaultLibrary = [
                 { name: 'Imatinib', id: 'CHEMBL941', type: 'Drug', status: 'Approved' },
                 { name: 'Aspirin', id: 'CHEMBL25', type: 'Drug', status: 'Approved' },
@@ -1446,6 +1456,7 @@ function App() {
               localStorage.setItem(userKey, JSON.stringify(defaultData));
               
               // Push to server
+              console.log('[DEBUG] syncUserData: Pushing seeded defaults to server...');
               await fetch('/api/library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1457,14 +1468,16 @@ function App() {
             }
           }
           // Mark state as fully loaded so future changes will sync to server
+          console.log('[DEBUG] syncUserData: Marking isLoaded as true.');
           setIsLoaded(true);
         }
       } catch (err) {
-        console.error('Error syncing user data with server:', err);
+        console.error('[DEBUG] syncUserData error during sync:', err);
         // Fallback to local storage if server is offline
         if (isMounted) {
           const savedData = localStorage.getItem(userKey);
           if (savedData) {
+            console.log('[DEBUG] syncUserData offline fallback: loaded data from localStorage:', savedData);
             const parsed = JSON.parse(savedData);
             setLibraryItems(parsed.libraryItems || []);
             setGlassmorphismIntensity(parsed.glassmorphismIntensity ?? 80);
@@ -1489,7 +1502,18 @@ function App() {
 
   // Sync state back to localStorage and server
   useEffect(() => {
-    if (!currentUser || !isLoaded) return;
+    console.log('[DEBUG] Save useEffect triggered. Status:', {
+      hasUser: !!currentUser,
+      userEmail: currentUser ? currentUser.email : null,
+      isLoaded,
+      libraryCount: libraryItems.length
+    });
+    if (!currentUser || !isLoaded) {
+      console.log('[DEBUG] Save useEffect skipped (guard failed).');
+      return;
+    }
+    
+    console.log('[DEBUG] Save useEffect guard passed. Saving libraryItems:', libraryItems);
     const userKey = `aura_user_data_${currentUser.email}`;
     const currentData = {
       libraryItems,
@@ -1510,7 +1534,12 @@ function App() {
         email: currentUser.email,
         ...currentData
       })
-    }).catch(err => console.error('Error syncing user library to server:', err));
+    })
+    .then(res => res.json())
+    .then(resJson => {
+      console.log('[DEBUG] Save response from server:', resJson);
+    })
+    .catch(err => console.error('[DEBUG] Error syncing user library to server:', err));
   }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded]);
 
 
