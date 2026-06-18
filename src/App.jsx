@@ -2834,42 +2834,46 @@ function App() {
             </div>
           ) : (
             <>
-              <header className="section-header">
-            <div>
-              <h1>{selectedItem ? selectedItem.name : 'Intelligence Overview'}</h1>
-              <p className="subtitle">{selectedItem ? `Advanced Analysis for ${selectedItem.id}` : 'Real-time biomedical data synthesis'}</p>
-            </div>
-            <div className="date-display">
-              {new Date().toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </div>
-          </header>
+              {!selectedItem && (
+                <>
+                  <header className="section-header">
+                    <div>
+                      <h1>Intelligence Overview</h1>
+                      <p className="subtitle">Real-time biomedical data synthesis</p>
+                    </div>
+                    <div className="date-display">
+                      {new Date().toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                  </header>
 
-          <div className="stats-row">
-            <StatCard 
-              label="Active Trials" 
-              value={dailyStats.trials} 
-              change={dailyStats.trialsChange} 
-              onClick={() => setActiveView('trials')}
-            />
-            <StatCard 
-              label="Molecules Indexed" 
-              value={dailyStats.molecules} 
-            />
-            <StatCard 
-              label="Pending Analysis" 
-              value={dailyStats.pending} 
-              alert 
-              onClick={() => setShowPendingModal(true)}
-            />
-          </div>
+                  <div className="stats-row">
+                    <StatCard 
+                      label="Active Trials" 
+                      value={dailyStats.trials} 
+                      change={dailyStats.trialsChange} 
+                      onClick={() => setActiveView('trials')}
+                    />
+                    <StatCard 
+                      label="Molecules Indexed" 
+                      value={dailyStats.molecules} 
+                    />
+                    <StatCard 
+                      label="Pending Analysis" 
+                      value={dailyStats.pending} 
+                      alert 
+                      onClick={() => setShowPendingModal(true)}
+                    />
+                  </div>
+                </>
+              )}
 
-          <div className="grid-layout">
-            <div className="glass-card main-viz">
-              {selectedItem ? (
+              <div className={`grid-layout ${selectedItem ? 'detail-active' : ''}`}>
+                <div className="glass-card main-viz">
+                  {selectedItem ? (
                 <div className="detail-view animate-fade-in">
                   <header className="detail-header">
                     <button className="back-button" onClick={() => setSelectedItem(null)}>
@@ -3016,7 +3020,7 @@ function App() {
                           )}
                         </div>
 
-                        <div className="detail-visualizer glass-card">
+                        <div className="detail-visualizer glass-card protein-viz-container">
                           <Protein3DViewer key={selectedItem.id} uniprotId={selectedItem.id} />
                         </div>
                       </div>
@@ -3417,7 +3421,7 @@ function App() {
 
                     {/* Tab 3.5 (Drug): Clinical Trials & Success Rates */}
                     {selectedItem.type !== 'Protein' && activeDetailTab === 'clinical' && (
-                      <div className="clinical-trials-tab-layout animate-fade-in glass-card" style={{ padding: '24px' }}>
+                      <div className="clinical-trials-tab-layout animate-fade-in glass-card">
                         <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)', margin: '0 0 4px 0' }}>Clinical Trial Analytics</h3>
                         <p className="subtitle" style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>
                           Aggregated outcomes and completion rates from ClinicalTrials.gov registry
@@ -3527,7 +3531,7 @@ function App() {
 
                     {/* Tab 4 (both): Publications */}
                     {activeDetailTab === 'publications' && (
-                      <div className="publications-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                      <div className="publications-tab-layout animate-fade-in glass-card">
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Scientific Publications</h3>
                         <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                           Live search results from Europe PMC
@@ -3688,7 +3692,7 @@ function App() {
 
                     {/* Tab 6 (Protein only): Tissue Expression Profile */}
                     {selectedItem.type === 'Protein' && activeDetailTab === 'expression' && (
-                      <div className="expression-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                      <div className="expression-tab-layout animate-fade-in glass-card">
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>Tissue Expression Profile</h3>
                         <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '20px' }}>
                           Median expression (TPM) across human tissues from GTEx Portal (v8)
@@ -3739,7 +3743,7 @@ function App() {
 
                     {/* Tab 7 (Protein only): Clinical Variants & GWAS */}
                     {selectedItem.type === 'Protein' && activeDetailTab === 'variants' && (
-                      <div className="variants-tab-layout animate-fade-in glass-card" style={{ padding: '20px' }}>
+                      <div className="variants-tab-layout animate-fade-in glass-card">
                         <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-color)', margin: '0 0 4px 0' }}>ClinVar & GWAS Risk Associations</h3>
                         <p className="subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                           Variant pathogenicity and genetic disease traits

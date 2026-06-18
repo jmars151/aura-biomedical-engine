@@ -277,6 +277,26 @@
   align-items: center;
 }
 
+/* Tab layout classes default padding */
+.clinical-trials-tab-layout,
+.publications-tab-layout,
+.expression-tab-layout,
+.variants-tab-layout {
+  padding: 24px;
+}
+
+.protein-3d-viewport {
+  height: 380px;
+}
+
+.detail-content .protein-viz-container {
+  height: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
 @media (max-width: 768px) {
   .detail-view {
     padding: 16px;
@@ -333,10 +353,21 @@
     grid-template-columns: repeat(2, 1fr) !important;
   }
   
+  .clinical-trials-tab-layout,
   .publications-tab-layout,
   .expression-tab-layout,
-  .variants-tab-layout {
+  .variants-tab-layout,
+  .detail-content .glass-card,
+  .detail-content .lipinski-card,
+  .detail-content .structure-card,
+  .detail-content .smiles-sandbox-card,
+  .detail-content .fda-chart-card {
     padding: 16px !important;
+  }
+  
+  /* Hide recent insights list when details are open on mobile to save vertical space */
+  .detail-active .side-list {
+    display: none !important;
   }
 }
 
@@ -400,6 +431,23 @@
 
   .variant-badge-wrapper {
     margin-top: 4px;
+  }
+  
+  .protein-3d-viewport {
+    height: 280px;
+  }
+  
+  .fda-stats-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+  
+  .fda-stat-card {
+    padding: 14px !important;
+  }
+  
+  .fda-value {
+    font-size: 20px;
   }
 }
 

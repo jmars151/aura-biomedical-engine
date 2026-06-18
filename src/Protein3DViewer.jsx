@@ -241,7 +241,6 @@ const Protein3DViewer = ({ uniprotId }) => {
         style={{ 
           position: 'relative', 
           width: '100%', 
-          height: '380px', 
           overflow: 'hidden',
           boxShadow: 'inset 0 0 20px var(--border-color)'
         }}
