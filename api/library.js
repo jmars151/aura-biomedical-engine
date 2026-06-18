@@ -106,7 +106,12 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         status: 'success',
-        data: userData
+        data: userData,
+        diagnostics: {
+          isBlobConfigured: isBlobConfigured(),
+          tokenPresent: !!process.env.BLOB_READ_WRITE_TOKEN,
+          nodeVersion: process.version
+        }
       });
     }
 
