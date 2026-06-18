@@ -2337,4 +2337,145 @@
   }
 }
 
+/* Support Form Layout & Styling */
+.contact-container {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.contact-card, .contact-info-card {
+  padding: 24px;
+  text-align: left;
+}
+
+.contact-card h3, .contact-info-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.contact-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  outline: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.contact-textarea {
+  resize: vertical;
+}
+
+.contact-alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.contact-alert h4 {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.contact-alert p {
+  font-size: 12px;
+}
+
+.contact-alert.success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.contact-alert.error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.required-star {
+  color: #ef4444;
+}
+
+.info-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--overlay-light);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.info-item .info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.info-item .info-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-secondary);
+}
+
+@media (max-width: 768px) {
+  .contact-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .submit-btn {
+    width: 100% !important;
+  }
+}
+
 

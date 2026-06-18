@@ -146,6 +146,137 @@
 }
 
 /* Responsive adjustments for DetailView */
+.export-pdf-btn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.export-pdf-btn:hover {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 500px;
+}
+
+.publication-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.publication-main-info {
+  flex: 1;
+}
+
+.publication-meta-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.expression-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  padding: 4px 0;
+  width: 100%;
+}
+
+.expression-tissue {
+  width: 110px;
+  font-weight: 500;
+  color: var(--text-main);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.expression-bar-and-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.expression-bar-wrapper {
+  flex: 1;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  overflow: hidden;
+  position: relative;
+}
+
+.expression-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0053D6, #65CBFF);
+  border-radius: 7px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.expression-value {
+  width: 70px;
+  text-align: right;
+  font-family: monospace;
+  color: var(--text-muted);
+  font-weight: bold;
+}
+
+.variant-item-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.variant-info {
+  flex: 1;
+}
+
+.variant-trait {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.variant-id-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.variant-badge-wrapper {
+  display: flex;
+  align-items: center;
+}
+
 @media (max-width: 768px) {
   .detail-view {
     padding: 16px;
@@ -201,6 +332,12 @@
   .clinical-stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+  
+  .publications-tab-layout,
+  .expression-tab-layout,
+  .variants-tab-layout {
+    padding: 16px !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -211,6 +348,58 @@
   
   .clinical-stats-grid {
     grid-template-columns: 1fr !important;
+  }
+  
+  .bioactivity-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .prop-badge-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .publication-card-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .publication-meta-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 8px;
+  }
+  
+  .expression-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .expression-tissue {
+    width: 100%;
+  }
+
+  .expression-bar-and-value {
+    width: 100%;
+    gap: 12px;
+  }
+  
+  .variant-item-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .variant-badge-wrapper {
+    margin-top: 4px;
   }
 }
 
@@ -223,6 +412,12 @@
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 8px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.detail-tabs-selector::-webkit-scrollbar {
+  display: none;
 }
 
 .detail-tab-btn {
@@ -758,7 +953,20 @@
 
 /* Responsive Overrides */
 @media (max-width: 1024px) {
-  .protein-pathways-layout,
+  .protein-pathways-layout {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .pathways-map-card {
+    height: 350px !important;
+  }
+  
+  .pathways-list-card {
+    height: 350px !important;
+  }
+
   .fda-charts-grid,
   .chem-data-row,
   .sandbox-workspace {
@@ -767,7 +975,7 @@
   }
   
   .fda-stats-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
   }
 }
 

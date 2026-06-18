@@ -310,7 +310,7 @@ const Protein3DViewer = ({ uniprotId }) => {
                 Coverage: <span style={{ fontWeight: '600', color: 'var(--text-color)' }}>{structureDetails.uniprotStart}-{structureDetails.uniprotEnd} ({structureDetails.seqLength} aa)</span>
               </div>
               
-              <div style={{ display: 'flex', gap: '12px', fontSize: '11px', fontWeight: '500' }}>
+              <div style={{ display: 'flex', gap: '12px', fontSize: '11px', fontWeight: '500', flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#0053D6', boxShadow: '0 0 8px rgba(0, 83, 214, 0.6)' }}></span>
                   <span>&gt;90 (Very High)</span>

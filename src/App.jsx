@@ -2884,19 +2884,7 @@ function App() {
                       <div className="detail-actions">
                         <button
                           onClick={() => window.print()}
-                          className="external-link"
-                          style={{ 
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'rgba(124, 58, 237, 0.08)',
-                            border: '1px solid rgba(124, 58, 237, 0.15)',
-                            color: 'var(--text-main)',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            fontSize: '13px'
-                          }}
+                          className="external-link export-pdf-btn"
                           title="Print or Save PDF report for this target profile"
                         >
                           <Download size={14} />
@@ -3569,8 +3557,8 @@ function App() {
                                     color: 'inherit'
                                   }}
                                 >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                                    <div style={{ flex: 1 }}>
+                                  <div className="publication-card-body">
+                                    <div className="publication-main-info">
                                       <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-color)', lineHeight: 1.4 }}>
                                         {pub.title}
                                       </h4>
@@ -3581,7 +3569,7 @@ function App() {
                                         <span style={{ fontWeight: '500' }}>{pub.journal}</span> • {pub.year}
                                       </div>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                                    <div className="publication-meta-actions">
                                       {pub.citations !== undefined && (
                                         <span style={{ 
                                           fontSize: '10px', 
@@ -3718,23 +3706,22 @@ function App() {
                                 return gtexData.map((d, idx) => {
                                   const pct = (d.tpm / maxTpm) * 100;
                                   return (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px' }}>
-                                      <div style={{ width: '110px', fontWeight: '500', color: 'var(--text-color)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                    <div key={idx} className="expression-row">
+                                      <div className="expression-tissue" title={d.tissue}>
                                         {d.tissue}
                                       </div>
-                                      <div style={{ flex: 1, height: '14px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '7px', overflow: 'hidden', position: 'relative' }}>
-                                        <div 
-                                          style={{ 
-                                            width: `${pct}%`, 
-                                            height: '100%', 
-                                            background: 'linear-gradient(90deg, #0053D6, #65CBFF)', 
-                                            borderRadius: '7px',
-                                            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
-                                          }} 
-                                        />
-                                      </div>
-                                      <div style={{ width: '70px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                                        {d.tpm.toFixed(1)} TPM
+                                      <div className="expression-bar-and-value">
+                                        <div className="expression-bar-wrapper">
+                                          <div 
+                                            className="expression-bar-fill"
+                                            style={{ 
+                                              width: `${pct}%`
+                                            }} 
+                                          />
+                                        </div>
+                                        <div className="expression-value">
+                                          {d.tpm.toFixed(1)} TPM
+                                        </div>
                                       </div>
                                     </div>
                                   );
@@ -3766,29 +3753,12 @@ function App() {
                           <div className="variants-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {gwasData && gwasData.length > 0 ? (
                               gwasData.map((item, idx) => (
-                                <div 
-                                  key={idx} 
-                                  style={{
-                                    padding: '12px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    background: 'rgba(255, 255, 255, 0.02)',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    flexWrap: 'wrap'
-                                  }}
-                                >
-                                  <div style={{ flex: '1 1 200px' }}>
-                                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>
-                                      {item.trait}
-                                    </h4>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                                      Locus ID: {item.variantId}
-                                    </span>
+                                <div key={idx} className="variant-item-card">
+                                  <div className="variant-info">
+                                    <h4 className="variant-trait">{item.trait}</h4>
+                                    <span className="variant-id-tag">Locus ID: {item.variantId}</span>
                                   </div>
-                                  <div>
+                                  <div className="variant-badge-wrapper">
                                     <span style={{
                                       fontSize: '10px',
                                       padding: '3px 8px',
