@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       body: new URLSearchParams({
         secret: recaptchaSecret,
         response: token
-      })
+      }).toString()
     });
 
     const recaptchaData = await recaptchaResponse.json();
