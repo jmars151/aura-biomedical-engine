@@ -1,36 +1,38 @@
+import { list, put } from '@vercel/blob';
 import fs from 'fs/promises';
 import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'api', 'library_db.json');
-const KV_URL = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
-// Check if Vercel KV is configured
-const isKvConfigured = () => !!(KV_URL && KV_TOKEN);
+// Check if Vercel Blob is configured
+const isBlobConfigured = () => !!BLOB_TOKEN;
 
-// Read user data from KV or local JSON file
+// Read user data from Vercel Blob or local JSON file
 async function readUserData(email) {
-  const key = `aura_user:${email}`;
+  // Safe filename replacing special characters
+  const filename = `aura_user_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}.json`;
   
-  if (isKvConfigured()) {
+  if (isBlobConfigured()) {
     try {
-      const response = await fetch(KV_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${KV_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(['GET', key])
+      const { blobs } = await list({
+        prefix: filename,
+        token: BLOB_TOKEN
       });
       
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson.result) {
-          return JSON.parse(resJson.result);
+      if (blobs && blobs.length > 0) {
+        // Match exact pathname
+        const exactBlob = blobs.find(b => b.pathname === filename);
+        if (exactBlob) {
+          const response = await fetch(exactBlob.url);
+          if (response.ok) {
+            return await response.json();
+          }
         }
       }
+      return null;
     } catch (err) {
-      console.error('Error reading from Vercel KV cloud:', err);
+      console.error('Error reading from Vercel Blob cloud:', err);
     }
   }
 
@@ -44,26 +46,20 @@ async function readUserData(email) {
   }
 }
 
-// Write user data to KV or local JSON file
+// Write user data to Vercel Blob or local JSON file
 async function writeUserData(email, data) {
-  const key = `aura_user:${email}`;
+  const filename = `aura_user_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}.json`;
 
-  if (isKvConfigured()) {
+  if (isBlobConfigured()) {
     try {
-      const response = await fetch(KV_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${KV_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(['SET', key, JSON.stringify(data)])
+      await put(filename, JSON.stringify(data), {
+        access: 'public',
+        addRandomSuffix: false,
+        token: BLOB_TOKEN
       });
-      
-      if (response.ok) {
-        return;
-      }
+      return;
     } catch (err) {
-      console.error('Error writing to Vercel KV cloud:', err);
+      console.error('Error writing to Vercel Blob cloud:', err);
     }
   }
 
