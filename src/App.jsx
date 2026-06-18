@@ -223,7 +223,7 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const prevAnalysesRef = useRef(pendingAnalyses);
-  const isLoadedRef = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const searchBlurTimeoutRef = useRef(null);
 
 
@@ -1354,8 +1354,6 @@ function App() {
   // Sync state on user change
   useEffect(() => {
     if (!currentUser) {
-      setLibraryItems([]);
-      isLoadedRef.current = false;
       return;
     }
     
@@ -1459,7 +1457,7 @@ function App() {
             }
           }
           // Mark state as fully loaded so future changes will sync to server
-          isLoadedRef.current = true;
+          setIsLoaded(true);
         }
       } catch (err) {
         console.error('Error syncing user data with server:', err);
@@ -1477,7 +1475,7 @@ function App() {
             }
             setNotifications(parsed.notifications || []);
           }
-          isLoadedRef.current = true;
+          setIsLoaded(true);
         }
       }
     }
@@ -1491,7 +1489,7 @@ function App() {
 
   // Sync state back to localStorage and server
   useEffect(() => {
-    if (!currentUser || !isLoadedRef.current) return;
+    if (!currentUser || !isLoaded) return;
     const userKey = `aura_user_data_${currentUser.email}`;
     const currentData = {
       libraryItems,
@@ -1513,7 +1511,7 @@ function App() {
         ...currentData
       })
     }).catch(err => console.error('Error syncing user library to server:', err));
-  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser]);
+  }, [libraryItems, glassmorphismIntensity, darkMode, pendingAnalyses, notifications, currentUser, isLoaded]);
 
 
   // Apply glassmorphism intensity CSS variable
@@ -1546,6 +1544,7 @@ function App() {
   }, [showNotifications]);
 
   const handleCredentialResponse = useCallback((response) => {
+    setIsLoaded(false);
     setIsLoggingIn(true);
     try {
       const idToken = response.credential;
@@ -1635,6 +1634,7 @@ function App() {
   }, [setCurrentUser, setIsLoggingIn, setNotifications]);
 
   const handleMockLogin = (userData) => {
+    setIsLoaded(false);
     setIsLoggingIn(true);
     setTimeout(() => {
       setCurrentUser(userData);
@@ -1661,11 +1661,16 @@ function App() {
   };
 
   const handleLogout = () => {
+    setIsLoaded(false);
     setCurrentUser(null);
     localStorage.removeItem('aura_current_user');
     setShowProfile(false);
     setNotifications([]);
     setShowNotifications(false);
+    setLibraryItems([]);
+    setGlassmorphismIntensity(80);
+    setDarkMode(true);
+    setPendingAnalyses([]);
   };
 
   // Initialize Google Sign-In button

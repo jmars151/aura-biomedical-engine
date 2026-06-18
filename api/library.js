@@ -46,7 +46,7 @@ async function readUserData(email) {
     const content = await fs.readFile(DB_PATH, 'utf-8');
     const db = JSON.parse(content);
     return db[email] || null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -78,7 +78,7 @@ async function writeUserData(email, data) {
     try {
       const content = await fs.readFile(DB_PATH, 'utf-8');
       db = JSON.parse(content);
-    } catch (e) {
+    } catch {
       // Ignore read error, start with empty database
     }
     
