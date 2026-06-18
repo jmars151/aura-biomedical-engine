@@ -38,6 +38,7 @@ async function readUserData(email) {
       return null;
     } catch (err) {
       console.error('Error reading from Vercel Blob cloud:', err);
+      throw err;
     }
   }
 
@@ -69,6 +70,7 @@ async function writeUserData(email, data) {
       return;
     } catch (err) {
       console.error('Error writing to Vercel Blob cloud:', err);
+      throw err;
     }
   }
 
@@ -86,6 +88,7 @@ async function writeUserData(email, data) {
     await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error writing to local database file:', err);
+    throw err;
   }
 }
 
