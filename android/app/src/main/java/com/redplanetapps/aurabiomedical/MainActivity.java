@@ -1,4 +1,4 @@
-package com.aurabiomedical.app;
+package com.redplanetapps.aurabiomedical;
 
 import com.getcapacitor.BridgeActivity;
 
