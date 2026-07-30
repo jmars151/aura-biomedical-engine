@@ -2096,6 +2096,8 @@ function App() {
             <div className={`search-container glass-card glow-border ${highlightSearch ? 'search-highlight-glow' : ''}`}>
               {loading ? <Loader2 className="search-icon animate-spin" size={18} /> : <Search className="search-icon" size={18} />}
               <input 
+                id="search-input-field"
+                name="searchQuery"
                 type="text" 
                 placeholder="Search molecular targets, drugs, or clinical trials..." 
                 value={searchQuery}
@@ -4475,6 +4477,8 @@ function BLASTView({ setSelectedItem, setActiveView }) {
         </div>
 
         <textarea
+          id="blast-sequence-input"
+          name="sequenceInput"
           value={sequenceInput}
           onChange={(e) => setSequenceInput(e.target.value)}
           placeholder="Paste protein sequence (e.g. MTEYKLVVVGAGGVGKSALTIQLIQNHFVDEYDPT...) or UniProt ID..."

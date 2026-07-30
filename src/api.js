@@ -27,9 +27,9 @@ export const searchBiomedicalData = async (query) => {
 
 async function searchDrugs(query) {
   try {
-    const response = await fetch(`${CHEMBL_BASE}/molecule/search?q=${query}&format=json&limit=5`);
+    const response = await fetch(`${CHEMBL_BASE}/molecule/search?q=${encodeURIComponent(query)}&format=json&limit=5`);
     const data = await response.json();
-    return data.molecules.map(m => ({
+    return (data.molecules || []).map(m => ({
       id: m.molecule_chembl_id,
       name: m.pref_name || m.molecule_synonyms?.[0]?.molecule_synonym || 'Unnamed Molecule',
       type: 'Drug/Compound',
@@ -40,9 +40,9 @@ async function searchDrugs(query) {
 
 async function searchProteins(query) {
   try {
-    const response = await fetch(`${UNIPROT_BASE}/search?query=${query}&format=json&size=5`);
+    const response = await fetch(`${UNIPROT_BASE}/search?query=${encodeURIComponent(query)}&format=json&size=5`);
     const data = await response.json();
-    return data.results.map(r => ({
+    return (data.results || []).map(r => ({
       id: r.primaryAccession,
       name: r.genes?.[0]?.geneName?.value || 'Unknown Gene',
       type: 'Protein',
@@ -53,13 +53,13 @@ async function searchProteins(query) {
 
 async function searchTrials(query) {
   try {
-    const response = await fetch(`${CLINICAL_TRIALS_BASE}?query.term=${query}&pageSize=5`);
+    const response = await fetch(`${CLINICAL_TRIALS_BASE}?query.term=${encodeURIComponent(query)}&pageSize=5`);
     const data = await response.json();
-    return data.studies.map(s => ({
-      id: s.protocolSection.identificationModule.nctId,
-      name: s.protocolSection.identificationModule.briefTitle,
+    return (data.studies || []).map(s => ({
+      id: s.protocolSection?.identificationModule?.nctId || 'N/A',
+      name: s.protocolSection?.identificationModule?.briefTitle || 'Untitled Study',
       type: 'Clinical Trial',
-      details: s.protocolSection.statusModule.overallStatus
+      details: s.protocolSection?.statusModule?.overallStatus || 'Unknown'
     }));
   } catch { return []; }
 }
