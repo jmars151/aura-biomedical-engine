@@ -8,6 +8,8 @@ const Protein3DViewer = ({ uniprotId }) => {
   const [structuresList, setStructuresList] = useState([]);
   const [selectedStructureId, setSelectedStructureId] = useState('AlphaFold');
   const [structureDetails, setStructureDetails] = useState(null);
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
+  const [overlayStructureId, setOverlayStructureId] = useState('');
   const [loadingList, setLoadingList] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -90,6 +92,10 @@ const Protein3DViewer = ({ uniprotId }) => {
         const defaultStruct = list.find(s => s.type === 'AlphaFold') || list[0];
         setSelectedStructureId(defaultStruct.id);
         setStructureDetails(defaultStruct);
+        if (list.length > 1) {
+          const secondStruct = list.find(s => s.id !== defaultStruct.id) || list[1];
+          setOverlayStructureId(secondStruct.id);
+        }
         setLoadingList(false);
       } catch (err) {
         if (active) {
@@ -107,7 +113,7 @@ const Protein3DViewer = ({ uniprotId }) => {
     };
   }, [uniprotId]);
 
-  // 2. Load and render selected structure
+  // 2. Load and render selected structure + overlay
   useEffect(() => {
     if (!structureDetails) return;
 
@@ -126,41 +132,54 @@ const Protein3DViewer = ({ uniprotId }) => {
         const pdbText = await pdbRes.text();
         if (!active) return;
 
+        let overlayPdbText = null;
+        if (overlayEnabled && overlayStructureId) {
+          const overlayStruct = structuresList.find(s => s.id === overlayStructureId);
+          if (overlayStruct && overlayStruct.pdbUrl) {
+            try {
+              const oRes = await fetch(overlayStruct.pdbUrl);
+              if (oRes.ok) {
+                overlayPdbText = await oRes.text();
+              }
+            } catch (oErr) {
+              console.warn('[Protein3DViewer] Overlay fetch failed:', oErr);
+            }
+          }
+        }
+
         if (!window.$3Dmol) {
           throw new Error('3Dmol.js library failed to load from CDN. Check your internet connection.');
         }
 
-        // Clear container
         if (containerRef.current) {
           containerRef.current.innerHTML = '';
         }
 
-        // Create the viewer
         const viewer = window.$3Dmol.createViewer(containerRef.current, {
           defaultcolors: window.$3Dmol.rasmolElementColors,
           backgroundColor: 'transparent'
         });
         viewerRef.current = viewer;
 
-        // Load the PDB model
-        viewer.addModel(pdbText, 'pdb');
-
-        // Apply style rules
+        const m1 = viewer.addModel(pdbText, 'pdb');
         if (structureDetails.type === 'AlphaFold') {
-          viewer.setStyle({}, {
+          m1.setStyle({}, {
             cartoon: {
               colorfunc: (atom) => {
-                if (atom.b < 50) return '#FF7D45'; // Very low (Orange)
-                if (atom.b < 70) return '#FFDB1A'; // Low (Yellow)
-                if (atom.b < 90) return '#65CBFF'; // Confident (Light Blue)
-                return '#0053D6'; // Very high (Dark Blue)
+                if (atom.b < 50) return '#FF7D45';
+                if (atom.b < 70) return '#FFDB1A';
+                if (atom.b < 90) return '#65CBFF';
+                return '#0053D6';
               }
             }
           });
         } else {
-          viewer.setStyle({}, {
-            cartoon: { color: 'spectrum' }
-          });
+          m1.setStyle({}, { cartoon: { color: 'spectrum' } });
+        }
+
+        if (overlayPdbText) {
+          const m2 = viewer.addModel(overlayPdbText, 'pdb');
+          m2.setStyle({}, { cartoon: { color: '#ec4899' } });
         }
 
         viewer.zoomTo();
@@ -183,7 +202,7 @@ const Protein3DViewer = ({ uniprotId }) => {
         viewerRef.current = null;
       }
     };
-  }, [structureDetails]);
+  }, [structureDetails, overlayEnabled, overlayStructureId, structuresList]);
 
   const handleStructureChange = (id) => {
     const matched = structuresList.find(s => s.id === id);
@@ -206,34 +225,76 @@ const Protein3DViewer = ({ uniprotId }) => {
           flexWrap: 'wrap'
         }}
       >
-        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>Conformer Selection</span>
-        {structuresList.length > 0 ? (
-          <select 
-            value={selectedStructureId} 
-            onChange={(e) => handleStructureChange(e.target.value)}
-            className="glass-select"
-            style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              border: '1px solid var(--border-color)', 
-              borderRadius: '6px', 
-              color: 'var(--text-color)', 
-              padding: '4px 8px', 
-              fontSize: '12px',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {structuresList.map(s => (
-              <option key={s.id} value={s.id} style={{ background: '#1a1a1e', color: '#fff' }}>
-                {s.type === 'AlphaFold' ? 'AlphaFold (Predicted)' : `${s.id} (${s.method}${s.resolution !== '-' ? ` - ${s.resolution}` : ''})`}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {loadingList ? 'Scanning database conformers...' : 'No structures available'}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-color)' }}>Conformer Selection</span>
+          {structuresList.length > 1 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={overlayEnabled} 
+                onChange={(e) => setOverlayEnabled(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              Dual Conformer Overlay
+            </label>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {structuresList.length > 0 ? (
+            <>
+              <select 
+                value={selectedStructureId} 
+                onChange={(e) => handleStructureChange(e.target.value)}
+                className="glass-select"
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '6px', 
+                  color: 'var(--text-color)', 
+                  padding: '4px 8px', 
+                  fontSize: '12px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {structuresList.map(s => (
+                  <option key={s.id} value={s.id} style={{ background: '#1a1a1e', color: '#fff' }}>
+                    {s.type === 'AlphaFold' ? 'Primary: AlphaFold (Predicted)' : `Primary: ${s.id} (${s.method})`}
+                  </option>
+                ))}
+              </select>
+
+              {overlayEnabled && structuresList.length > 1 && (
+                <select 
+                  value={overlayStructureId} 
+                  onChange={(e) => setOverlayStructureId(e.target.value)}
+                  className="glass-select"
+                  style={{ 
+                    background: 'rgba(236, 72, 153, 0.15)', 
+                    border: '1px solid #ec4899', 
+                    borderRadius: '6px', 
+                    color: '#ec4899', 
+                    padding: '4px 8px', 
+                    fontSize: '12px',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {structuresList.map(s => (
+                    <option key={s.id} value={s.id} style={{ background: '#1a1a1e', color: '#fff' }}>
+                      {s.type === 'AlphaFold' ? 'Overlay: AlphaFold (Predicted)' : `Overlay: ${s.id} (${s.method})`}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {loadingList ? 'Scanning database conformers...' : 'No structures available'}
+            </span>
+          )}
+        </div>
       </div>
 
       <div 
