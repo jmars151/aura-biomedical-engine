@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AURA Biomedical</string>
+    <string name="title_activity_main">AURA Biomedical</string>
+    <string name="package_name">com.aurabiomedical.app</string>
+    <string name="custom_url_scheme">com.aurabiomedical.app</string>
+</resources>
