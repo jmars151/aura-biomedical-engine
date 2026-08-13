@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Clock, TrendingUp, Trash2, Sparkles, ShieldCheck, Award, Zap, BarChart3, Dna } from 'lucide-react';
+import { Search, LayoutDashboard, Database, Activity, Settings, Bell, ChevronRight, FlaskConical, Loader2, ExternalLink, Menu, X, Mail, Copy, Download, Clock, TrendingUp, Trash2, Sparkles, ShieldCheck, Award, Zap, BarChart3, Dna, Atom, Scissors, BookOpen } from 'lucide-react';
 import { searchBiomedicalData, fetchRecentTrials, fetchLiveMetrics, fetchLiveDatabaseStats, fetchFDASafetyData, fetchPubChemData, fetchReactomePathways, fetchEuropePMCPublications, fetchEnsemblGenomics, fetchGTExExpression, fetchGWASAssociations, fetchDrugTrialSuccessRates, fetchProteinSubcellularAndConstraint, fetchDrugMechanismAndStatus } from './api';
 import InteractionMap from './InteractionMap';
 import BindingVisualizer from './BindingVisualizer';
 import Protein3DViewer from './Protein3DViewer';
 import PhylogeneticTree from './PhylogeneticTree';
+import ChemicalStructureEditor from './ChemicalStructureEditor';
+import CRISPRGuideDesigner from './CRISPRGuideDesigner';
+import PatentLiteratureDigest from './PatentLiteratureDigest';
+import MultiOmicsExpression from './MultiOmicsExpression';
+import ProteomeOffTargetScreening from './ProteomeOffTargetScreening';
 import './App.css';
 import './DetailView.css';
 import './InteractionMap.css';
@@ -1876,76 +1881,58 @@ function App() {
                 )}
               </div>
 
-              <div className="divider-or" style={{ margin: '8px 0' }}>
-                <span>or use Developer Presets (Offline)</span>
+              <div className="divider-or" style={{ margin: '12px 0 8px 0' }}>
+                <span>or</span>
               </div>
 
-              <div className="preset-users">
+              <div className="guest-signin-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <button 
-                  className="preset-user-btn glass-card"
+                  type="button"
+                  className="guest-login-btn glass-card"
                   onClick={() => handleMockLogin({
-                    email: 'dr.researcher@aura.org',
-                    name: 'Dr. Researcher',
-                    role: 'Admin Access',
-                    avatarSeed: 'researcher',
-                    isGoogle: false
-                  })}
-                >
-                  <div className="user-avatar-mini researcher">DR</div>
-                  <div className="preset-user-info">
-                    <p className="preset-user-name">Dr. Researcher</p>
-                    <p className="preset-user-email">dr.researcher@aura.org (Admin)</p>
-                  </div>
-                </button>
-
-                <button 
-                  className="preset-user-btn glass-card"
-                  onClick={() => handleMockLogin({
-                    email: 'alex.carter@biotech.io',
-                    name: 'Dr. Alex Carter',
-                    role: 'Senior Scientist',
-                    avatarSeed: 'carter',
-                    isGoogle: false
-                  })}
-                >
-                  <div className="user-avatar-mini scientist">AC</div>
-                  <div className="preset-user-info">
-                    <p className="preset-user-name">Dr. Alex Carter</p>
-                    <p className="preset-user-email">alex.carter@biotech.io</p>
-                  </div>
-                </button>
-
-                <button 
-                  className="preset-user-btn glass-card"
-                  onClick={() => handleMockLogin({
-                    email: 'guest.user@gmail.com',
-                    name: 'Guest Researcher',
+                    email: 'guest@aurabiomedical.org',
+                    name: 'Guest Scientist',
                     role: 'Standard Access',
-                    avatarSeed: 'guest',
+                    avatarSeed: 'guest_scientist',
                     isGoogle: false
                   })}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    maxWidth: '320px',
+                    height: '44px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '24px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  <div className="user-avatar-mini guest">GR</div>
-                  <div className="preset-user-info">
-                    <p className="preset-user-name">Guest Researcher</p>
-                    <p className="preset-user-email">guest.user@gmail.com</p>
-                  </div>
+                  <FlaskConical size={18} style={{ color: 'var(--accent-primary)' }} />
+                  <span>Continue as Guest Scientist</span>
                 </button>
               </div>
 
-              <div className="divider-or" style={{ margin: '8px 0' }}>
-                <span>or enter a custom email</span>
+              <div className="divider-or" style={{ margin: '12px 0 8px 0' }}>
+                <span>or enter your email</span>
               </div>
 
-              <form onSubmit={handleCustomLogin} className="custom-login-form">
+              <form onSubmit={handleCustomLogin} className="custom-login-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
                 <input 
                   type="email" 
-                  placeholder="name@gmail.com" 
+                  placeholder="name@organization.com" 
                   required
                   className="custom-login-input glass-card"
+                  style={{ width: '100%', maxWidth: '320px', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#fff' }}
                 />
-                <button type="submit" className="google-sign-in-btn dev-bypass-btn">
-                  <span>Developer Bypass Sign-In</span>
+                <button type="submit" className="custom-sign-in-btn" style={{ width: '100%', maxWidth: '320px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent-primary), #6366f1)', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>
+                  <span>Sign In with Email</span>
                 </button>
               </form>
             </div>
@@ -2005,6 +1992,24 @@ function App() {
             label="Trials" 
             active={activeView === 'trials'}
             onClick={() => { setActiveView('trials'); setSidebarOpen(false); }}
+          />
+          <NavItem 
+            icon={<Atom size={20} />} 
+            label="Structure Canvas" 
+            active={activeView === 'editor'}
+            onClick={() => { setActiveView('editor'); setSidebarOpen(false); }}
+          />
+          <NavItem 
+            icon={<Scissors size={20} />} 
+            label="CRISPR Designer" 
+            active={activeView === 'crispr'}
+            onClick={() => { setActiveView('crispr'); setSidebarOpen(false); }}
+          />
+          <NavItem 
+            icon={<BookOpen size={20} />} 
+            label="Patent Digest" 
+            active={activeView === 'patents'}
+            onClick={() => { setActiveView('patents'); setSidebarOpen(false); }}
           />
           <NavItem 
             icon={<Settings size={20} />} 
@@ -2457,6 +2462,11 @@ function App() {
               addNotification={addNotification}
             />
           )}
+          {activeView === 'editor' && (
+            <ChemicalStructureEditor onSelectStructure={(item) => { setSelectedItem(item); setActiveView('dashboard'); }} />
+          )}
+          {activeView === 'crispr' && <CRISPRGuideDesigner />}
+          {activeView === 'patents' && <PatentLiteratureDigest />}
           {activeView === 'contact' && (
             <ContactView addNotification={addNotification} />
           )}
@@ -3307,6 +3317,7 @@ function App() {
                                   </div>
                                 </div>
                               </div>
+                              <ProteomeOffTargetScreening />
                             </>
                           )
                         )}

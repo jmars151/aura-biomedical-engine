@@ -46,3 +46,11 @@ desktop.ini
 # Local Database Files
 api/library_db.json
 
+# Android Security & Build Outputs
+*.jks
+*.keystore
+local.properties
+android/app/build/
+android/build/
+
+
