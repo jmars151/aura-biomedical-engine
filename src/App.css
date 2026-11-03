@@ -1243,9 +1243,125 @@
 
 .login-card {
   width: 100%;
-  max-width: 460px;
+  max-width: 560px;
   padding: 40px;
   text-align: center;
+}
+
+.login-primary-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.login-primary-actions > button,
+.login-primary-actions .google-signin-slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.google-signin-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-primary-actions > button,
+.google-signin-custom-btn,
+.guest-login-btn {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.google-signin-custom-btn {
+  background-color: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.google-signin-custom-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.google-signin-custom-btn:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.guest-login-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.guest-login-btn:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.hidden-gsi-button {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.google-signin-error {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.28);
+  color: #fecaca;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.google-signin-error p {
+  margin: 0 0 10px 0;
+}
+
+.google-signin-retry-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.google-signin-retry-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 520px) {
+  .login-primary-actions {
+    flex-direction: column;
+  }
 }
 
 .login-header {
