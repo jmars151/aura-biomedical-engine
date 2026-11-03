@@ -12,6 +12,8 @@ export const GOOGLE_ERROR_CODES = {
   NETWORK: 'network',
   PLAY_SERVICES: 'play_services',
   PLUGIN_INIT: 'plugin_init',
+  CLOUD_CONFIG: 'cloud_config',
+  NO_CREDENTIAL: 'no_credential',
   TOKEN: 'token',
   TIMEOUT: 'timeout',
   UNKNOWN: 'unknown',
@@ -26,12 +28,25 @@ export const GOOGLE_ERROR_MESSAGES = {
     'Google Play services is missing or needs an update. Update Play services and retry, or continue as Guest.',
   [GOOGLE_ERROR_CODES.PLUGIN_INIT]:
     'Google sign-in could not start. Retry in a moment, or continue as Guest.',
+  [GOOGLE_ERROR_CODES.CLOUD_CONFIG]:
+    'Google Cloud is not accepting this Play-signed build yet (package + signing SHA-1 + web client). Retry after console changes propagate, or continue as Guest.',
+  [GOOGLE_ERROR_CODES.NO_CREDENTIAL]:
+    'No Google account was available to sign in. Add a Google account on the device, retry, or continue as Guest.',
   [GOOGLE_ERROR_CODES.TOKEN]:
     'We could not verify the Google account. Retry sign-in, or continue as Guest.',
   [GOOGLE_ERROR_CODES.TIMEOUT]:
     'Google sign-in took too long. Retry, or continue as Guest.',
   [GOOGLE_ERROR_CODES.UNKNOWN]:
     'Google sign-in did not complete. Retry, or continue as Guest to keep using the app.',
+};
+
+// Standard Sign in with Google / account-picker UI. Do not use bottom-sheet
+// GetGoogleIdOption with filterByAuthorizedAccounts or autoSelect — those can
+// throw NoCredentialException before any picker appears.
+export const NATIVE_GOOGLE_LOGIN_OPTIONS = {
+  style: 'standard',
+  filterByAuthorizedAccounts: false,
+  autoSelectEnabled: false,
 };
 
 let nativeInitPromise = null;
@@ -99,6 +114,14 @@ export function withTimeout(promise, ms, message = 'Google sign-in timed out') {
 function collectErrorText(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
+  let dataText = '';
+  if (error.data && typeof error.data === 'object') {
+    try {
+      dataText = JSON.stringify(error.data);
+    } catch {
+      dataText = '';
+    }
+  }
   return [
     error.code,
     error.message,
@@ -107,9 +130,25 @@ function collectErrorText(error) {
     error.reason,
     error.cause?.message,
     error.cause?.code,
+    dataText,
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+export function isNoCredentialError(error) {
+  const raw = collectErrorText(error).toLowerCase();
+  return /no credential|nocredentialexception|no google accounts available/.test(raw);
+}
+
+export function isUninitializedProviderError(error) {
+  const raw = collectErrorText(error).toLowerCase();
+  return /not initialized|cannot find provider|provider was not initialized/.test(raw);
+}
+
+export function isDeveloperConsoleError(error) {
+  const raw = collectErrorText(error).toLowerCase();
+  return /28444|developer console is not set up|developer_error|apiexception:\s*10\b/.test(raw);
 }
 
 export function formatGoogleAuthErrorDetails(error) {
@@ -151,8 +190,14 @@ export function classifyGoogleAuthError(error) {
   if (/timeout|timed out/.test(raw)) {
     return match(GOOGLE_ERROR_CODES.TIMEOUT);
   }
+  if (isDeveloperConsoleError(error)) {
+    return match(GOOGLE_ERROR_CODES.CLOUD_CONFIG);
+  }
+  if (isNoCredentialError(error)) {
+    return match(GOOGLE_ERROR_CODES.NO_CREDENTIAL);
+  }
   if (
-    /initialize|plugin|not implemented|unimpl|sociallogin|no provider|could not start|still loading|main activity|cannot use scopes|cannot use offline|28444|developer console is not set up/.test(
+    /initialize|plugin|not implemented|unimpl|sociallogin|no provider|could not start|still loading|main activity|cannot use scopes|cannot use offline/.test(
       raw
     )
   ) {
@@ -220,19 +265,41 @@ export async function signInWithNativeGoogle({
     throw error;
   }
 
+  const loginOnce = (options) =>
+    withTimeout(
+      SocialLogin.login({
+        provider: 'google',
+        options,
+      }),
+      loginTimeoutMs,
+      'Google sign-in timed out'
+    );
+
   // Do not pass custom scopes. The plugin already requests the default OIDC
   // email/profile/openid scopes. Passing a scopes array makes 8.x reject
   // immediately unless MainActivity implements ModifiedMainActivityForSocialLoginPlugin.
-  const loginResult = await withTimeout(
-    SocialLogin.login({
-      provider: 'google',
-      options: {
+  let loginResult;
+  try {
+    loginResult = await loginOnce(NATIVE_GOOGLE_LOGIN_OPTIONS);
+  } catch (error) {
+    if (isUninitializedProviderError(error)) {
+      resetNativeGoogleInit();
+      await initializeNativeGoogleSignIn(SocialLogin, webClientId);
+      loginResult = await loginOnce(NATIVE_GOOGLE_LOGIN_OPTIONS);
+    } else if (isNoCredentialError(error)) {
+      // Plugin only auto-falls back from bottom UI. Force the standard
+      // Sign in with Google picker once more with filtering disabled.
+      loginResult = await loginOnce({
+        ...NATIVE_GOOGLE_LOGIN_OPTIONS,
+        style: 'standard',
         filterByAuthorizedAccounts: false,
-      },
-    }),
-    loginTimeoutMs,
-    'Google sign-in timed out'
-  );
+        autoSelectEnabled: false,
+        forcePrompt: true,
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const idToken = extractGoogleIdToken(loginResult);
   if (!idToken) {

@@ -3,6 +3,7 @@ import {
   GOOGLE_ERROR_CODES,
   GOOGLE_ERROR_MESSAGES,
   GOOGLE_WEB_CLIENT_ID,
+  NATIVE_GOOGLE_LOGIN_OPTIONS,
   classifyGoogleAuthError,
   decodeJwt,
   extractGoogleIdToken,
@@ -44,7 +45,11 @@ describe('classifyGoogleAuthError', () => {
     [{ message: 'Google sign-in timed out' }, GOOGLE_ERROR_CODES.TIMEOUT],
     [{ message: 'You CANNOT use scopes without modifying the main activity. Please follow the docs!' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
     [{ message: 'You CANNOT use offline mode without modifying the main activity. Please follow the docs!' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
-    [{ message: 'GetCredentialCustomException: [28444] Developer console is not set up correctly' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
+    [{ message: 'Cannot find provider \'google\'. Provider was not initialized.' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
+    [{ message: 'GetCredentialCustomException: [28444] Developer console is not set up correctly' }, GOOGLE_ERROR_CODES.CLOUD_CONFIG],
+    [{ message: 'DEVELOPER_ERROR' }, GOOGLE_ERROR_CODES.CLOUD_CONFIG],
+    [{ message: 'Google Sign-In failed: No credentials available' }, GOOGLE_ERROR_CODES.NO_CREDENTIAL],
+    [{ message: 'NoCredentialException' }, GOOGLE_ERROR_CODES.NO_CREDENTIAL],
     [{ message: 'something unexpected' }, GOOGLE_ERROR_CODES.UNKNOWN],
   ])('classifies %j as %s', (error, code) => {
     const classified = classifyGoogleAuthError(error);
@@ -122,9 +127,44 @@ describe('native Google sign-in', () => {
     });
     expect(SocialLogin.login).toHaveBeenCalledWith({
       provider: 'google',
-      options: { filterByAuthorizedAccounts: false },
+      options: NATIVE_GOOGLE_LOGIN_OPTIONS,
     });
     expect(SocialLogin.login.mock.calls[0][0].options.scopes).toBeUndefined();
+  });
+
+  it('re-initializes when the plugin says Google was not initialized', async () => {
+    const SocialLogin = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      login: vi
+        .fn()
+        .mockRejectedValueOnce({ message: "Cannot find provider 'google'. Provider was not initialized." })
+        .mockResolvedValueOnce({ result: { idToken: 'after-reinit' } }),
+    };
+
+    await expect(signInWithNativeGoogle({ SocialLogin, loginTimeoutMs: 1000 })).resolves.toBe('after-reinit');
+    expect(SocialLogin.initialize).toHaveBeenCalledTimes(2);
+    expect(SocialLogin.login).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries NoCredentialException with an explicit account-picker request', async () => {
+    const SocialLogin = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      login: vi
+        .fn()
+        .mockRejectedValueOnce({ message: 'NoCredentialException: No credentials available' })
+        .mockResolvedValueOnce({ result: { idToken: 'picker-token' } }),
+    };
+
+    await expect(signInWithNativeGoogle({ SocialLogin, loginTimeoutMs: 1000 })).resolves.toBe('picker-token');
+    expect(SocialLogin.login).toHaveBeenNthCalledWith(2, {
+      provider: 'google',
+      options: {
+        style: 'standard',
+        filterByAuthorizedAccounts: false,
+        autoSelectEnabled: false,
+        forcePrompt: true,
+      },
+    });
   });
 
   it('allows initialize to be retried after a plugin failure', async () => {
