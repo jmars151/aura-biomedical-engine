@@ -96,6 +96,12 @@ export default function LoginScreen({
           {googleAuthError?.message && (
             <div className="google-signin-error" role="alert" data-testid="google-signin-error">
               <p>{googleAuthError.message}</p>
+              {googleAuthError.details && (
+                <details className="google-signin-error-details" data-testid="google-signin-error-details">
+                  <summary>Technical details</summary>
+                  <pre>{googleAuthError.details}</pre>
+                </details>
+              )}
               {googleAuthError.canRetry && (
                 <button
                   type="button"
