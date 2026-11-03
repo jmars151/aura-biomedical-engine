@@ -42,6 +42,9 @@ describe('classifyGoogleAuthError', () => {
     [{ message: 'Google Sign-In is still loading' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
     [{ message: 'Invalid token payload' }, GOOGLE_ERROR_CODES.TOKEN],
     [{ message: 'Google sign-in timed out' }, GOOGLE_ERROR_CODES.TIMEOUT],
+    [{ message: 'You CANNOT use scopes without modifying the main activity. Please follow the docs!' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
+    [{ message: 'You CANNOT use offline mode without modifying the main activity. Please follow the docs!' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
+    [{ message: 'GetCredentialCustomException: [28444] Developer console is not set up correctly' }, GOOGLE_ERROR_CODES.PLUGIN_INIT],
     [{ message: 'something unexpected' }, GOOGLE_ERROR_CODES.UNKNOWN],
   ])('classifies %j as %s', (error, code) => {
     const classified = classifyGoogleAuthError(error);
@@ -49,6 +52,16 @@ describe('classifyGoogleAuthError', () => {
     expect(classified.message).toBe(GOOGLE_ERROR_MESSAGES[code]);
     expect(classified.canRetry).toBe(true);
     expect(classified.message.toLowerCase()).toContain('guest');
+    expect(classified.details).toBeTruthy();
+  });
+
+  it('keeps the raw plugin message in details so on-device diagnosis is possible', () => {
+    const classified = classifyGoogleAuthError({
+      code: 'UNIMPLEMENTED',
+      message: 'You CANNOT use scopes without modifying the main activity. Please follow the docs!',
+    });
+    expect(classified.details).toContain('UNIMPLEMENTED');
+    expect(classified.details).toContain('You CANNOT use scopes');
   });
 });
 
@@ -102,12 +115,16 @@ describe('native Google sign-in', () => {
     expect(second).toBe('native-token');
     expect(SocialLogin.initialize).toHaveBeenCalledTimes(1);
     expect(SocialLogin.initialize).toHaveBeenCalledWith({
-      google: { webClientId: expect.stringContaining('.apps.googleusercontent.com') },
+      google: {
+        webClientId: expect.stringContaining('.apps.googleusercontent.com'),
+        mode: 'online',
+      },
     });
     expect(SocialLogin.login).toHaveBeenCalledWith({
       provider: 'google',
-      options: { scopes: ['email', 'profile'] },
+      options: { filterByAuthorizedAccounts: false },
     });
+    expect(SocialLogin.login.mock.calls[0][0].options.scopes).toBeUndefined();
   });
 
   it('allows initialize to be retried after a plugin failure', async () => {

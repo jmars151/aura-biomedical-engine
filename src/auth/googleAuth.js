@@ -112,13 +112,35 @@ function collectErrorText(error) {
     .join(' ');
 }
 
+export function formatGoogleAuthErrorDetails(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  const parts = [];
+  if (error.code) parts.push(`code: ${error.code}`);
+  const message = error.message || error.errorMessage || error.error;
+  if (message) parts.push(String(message));
+  if (error.reason && error.reason !== message) parts.push(String(error.reason));
+  if (error.cause?.message) parts.push(String(error.cause.message));
+  if (error.cause?.code) parts.push(`cause: ${error.cause.code}`);
+  if (!parts.length) {
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+  return parts.join(' — ');
+}
+
 export function classifyGoogleAuthError(error) {
   const raw = collectErrorText(error).toLowerCase();
+  const details = formatGoogleAuthErrorDetails(error);
 
   const match = (code) => ({
     code,
     message: GOOGLE_ERROR_MESSAGES[code],
     canRetry: true,
+    details,
   });
 
   if (
@@ -130,9 +152,17 @@ export function classifyGoogleAuthError(error) {
     return match(GOOGLE_ERROR_CODES.TIMEOUT);
   }
   if (
-    /network|offline|failed to fetch|internet|unreachable|err_internet|connection|err_name_not_resolved/.test(
+    /initialize|plugin|not implemented|unimpl|sociallogin|no provider|could not start|still loading|main activity|cannot use scopes|cannot use offline|28444|developer console is not set up/.test(
       raw
     )
+  ) {
+    return match(GOOGLE_ERROR_CODES.PLUGIN_INIT);
+  }
+  if (
+    /no internet|failed to fetch|unreachable|err_internet|err_name_not_resolved|network error|connection refused|\boffline\b/.test(
+      raw
+    ) &&
+    !/offline mode/.test(raw)
   ) {
     return match(GOOGLE_ERROR_CODES.NETWORK);
   }
@@ -143,14 +173,7 @@ export function classifyGoogleAuthError(error) {
   ) {
     return match(GOOGLE_ERROR_CODES.PLAY_SERVICES);
   }
-  if (
-    /initialize|plugin|not implemented|unimpl|sociallogin|no provider|could not start|still loading/.test(
-      raw
-    )
-  ) {
-    return match(GOOGLE_ERROR_CODES.PLUGIN_INIT);
-  }
-  if (/token|jwt|payload|credential|invalid token/.test(raw)) {
+  if (/token|jwt|payload|invalid token/.test(raw)) {
     return match(GOOGLE_ERROR_CODES.TOKEN);
   }
   return match(GOOGLE_ERROR_CODES.UNKNOWN);
@@ -164,7 +187,10 @@ export async function initializeNativeGoogleSignIn(SocialLogin, webClientId = GO
   }
   if (!nativeInitPromise) {
     nativeInitPromise = SocialLogin.initialize({
-      google: { webClientId },
+      google: {
+        webClientId,
+        mode: 'online',
+      },
     });
   }
   try {
@@ -194,10 +220,15 @@ export async function signInWithNativeGoogle({
     throw error;
   }
 
+  // Do not pass custom scopes. The plugin already requests the default OIDC
+  // email/profile/openid scopes. Passing a scopes array makes 8.x reject
+  // immediately unless MainActivity implements ModifiedMainActivityForSocialLoginPlugin.
   const loginResult = await withTimeout(
     SocialLogin.login({
       provider: 'google',
-      options: { scopes: ['email', 'profile'] },
+      options: {
+        filterByAuthorizedAccounts: false,
+      },
     }),
     loginTimeoutMs,
     'Google sign-in timed out'

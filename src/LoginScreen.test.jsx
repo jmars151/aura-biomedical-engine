@@ -52,6 +52,7 @@ describe('LoginScreen', () => {
 
     expect(screen.getByTestId('google-signin-error')).toHaveTextContent(/cancelled/i);
     expect(screen.getByTestId('google-signin-error')).toHaveTextContent(/guest/i);
+    expect(screen.getByTestId('google-signin-error-details')).toHaveTextContent(/USER_CANCELLED/);
     fireEvent.click(screen.getByTestId('google-signin-retry'));
     fireEvent.click(screen.getByTestId('guest-continue-btn'));
     expect(onGoogleSignIn).toHaveBeenCalledTimes(1);
@@ -98,5 +99,24 @@ describe('LoginScreen', () => {
     );
     expect(screen.queryByTestId('gsi-button-container')).not.toBeInTheDocument();
     expect(screen.getByTestId('login-primary-actions').querySelectorAll('button')).toHaveLength(2);
+  });
+
+  it('hides technical details until expanded', () => {
+    const failed = classifyGoogleAuthError({
+      code: 'UNIMPLEMENTED',
+      message: 'You CANNOT use scopes without modifying the main activity. Please follow the docs!',
+    });
+    render(
+      <LoginScreen
+        googleAuthError={failed}
+        onGoogleSignIn={() => {}}
+        onGuestContinue={() => {}}
+        onEmailSignIn={(e) => e.preventDefault()}
+      />
+    );
+    const details = screen.getByTestId('google-signin-error-details');
+    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveTextContent('Technical details');
+    expect(details).toHaveTextContent('You CANNOT use scopes');
   });
 });
