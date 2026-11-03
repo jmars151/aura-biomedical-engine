@@ -10,24 +10,23 @@ import CRISPRGuideDesigner from './CRISPRGuideDesigner';
 import PatentLiteratureDigest from './PatentLiteratureDigest';
 import MultiOmicsExpression from './MultiOmicsExpression';
 import ProteomeOffTargetScreening from './ProteomeOffTargetScreening';
+import { Capacitor } from '@capacitor/core';
+import LoginScreen from './LoginScreen';
+import { GUEST_USER } from './auth/guestUser';
+import {
+  GOOGLE_WEB_CLIENT_ID,
+  classifyGoogleAuthError,
+  initializeNativeGoogleSignIn,
+  isNativePlatform,
+  isOffline,
+  signInWithNativeGoogle,
+  userFromIdToken,
+} from './auth/googleAuth';
+import { clearPersistedUser, persistUser, readPersistedUser } from './auth/session';
 import './App.css';
 import './DetailView.css';
 import './InteractionMap.css';
 import './BindingVisualizer.css';
-
-const decodeJwt = (token) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error("Failed to decode JWT token", e);
-    return null;
-  }
-};
 
 const mapCountryToRegion = (country) => {
   if (!country || country === 'Unknown') return 'Rest of World';
@@ -1346,11 +1345,11 @@ function App() {
   }, []);
 
   // Authentication & Session state
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('aura_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [currentUser, setCurrentUser] = useState(() => readPersistedUser());
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleAuthError, setGoogleAuthError] = useState(null);
+  const loginGenerationRef = useRef(0);
 
   // User-specific settings & database
   const [libraryItems, setLibraryItems] = useState([]);
@@ -1550,26 +1549,25 @@ function App() {
   }, [showNotifications]);
 
   const handleCredentialResponse = useCallback((response) => {
+    const generation = loginGenerationRef.current;
+    setGoogleAuthError(null);
     setIsLoaded(false);
     setIsLoggingIn(true);
     try {
-      const idToken = response.credential;
-      const payload = decodeJwt(idToken);
-      
-      if (payload && payload.email) {
-        const userData = {
-          email: payload.email,
-          name: payload.name || payload.given_name || 'Google Researcher',
-          role: payload.email.endsWith('@aura.org') ? 'Admin Access' : 'Standard Access',
-          avatarSeed: payload.picture || payload.given_name || 'google',
-          isGoogle: true
-        };
-        
+      const userData = userFromIdToken(response?.credential);
+
+      if (userData) {
         setTimeout(() => {
+          if (generation !== loginGenerationRef.current) {
+            setIsLoggingIn(false);
+            setGoogleBusy(false);
+            return;
+          }
           setCurrentUser(userData);
-          localStorage.setItem('aura_current_user', JSON.stringify(userData));
+          persistUser(userData);
           setIsLoggingIn(false);
-          
+          setGoogleBusy(false);
+
           // Seed welcome message for this specific Google user profile
           const welcomeMsg = {
             id: 'welcome_' + Date.now(),
@@ -1579,7 +1577,7 @@ function App() {
             read: false,
             type: 'welcome'
           };
-          
+
           const userKey = `aura_user_data_${userData.email}`;
           const savedData = localStorage.getItem(userKey);
           let loadedNotifications = [welcomeMsg];
@@ -1606,7 +1604,7 @@ function App() {
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString()
             };
             loadedNotifications = [upgradeNotif, ...loadedNotifications];
-            
+
             try {
               if (parsed) {
                 localStorage.setItem(userKey, JSON.stringify({
@@ -1630,23 +1628,32 @@ function App() {
         }, 1000);
       } else {
         setIsLoggingIn(false);
-        alert("Google authentication failed: Invalid token payload");
+        setGoogleBusy(false);
+        setGoogleAuthError(classifyGoogleAuthError({ message: 'Invalid token payload' }));
       }
     } catch (error) {
       console.error("Google login callback error:", error);
       setIsLoggingIn(false);
-      alert("Google authentication encountered an error.");
+      setGoogleBusy(false);
+      setGoogleAuthError(classifyGoogleAuthError(error));
     }
   }, [setCurrentUser, setIsLoggingIn, setNotifications]);
 
-  const handleMockLogin = (userData) => {
+  const handleLocalLogin = (userData) => {
+    loginGenerationRef.current += 1;
+    setGoogleAuthError(null);
     setIsLoaded(false);
     setIsLoggingIn(true);
     setTimeout(() => {
       setCurrentUser(userData);
-      localStorage.setItem('aura_current_user', JSON.stringify(userData));
+      persistUser(userData);
       setIsLoggingIn(false);
+      setGoogleBusy(false);
     }, 1200);
+  };
+
+  const handleGuestContinue = () => {
+    handleLocalLogin(GUEST_USER);
   };
 
   const handleCustomLogin = (e) => {
@@ -1663,13 +1670,13 @@ function App() {
       avatarSeed: name,
       isGoogle: false
     };
-    handleMockLogin(userData);
+    handleLocalLogin(userData);
   };
 
   const handleLogout = () => {
     setIsLoaded(false);
     setCurrentUser(null);
-    localStorage.removeItem('aura_current_user');
+    clearPersistedUser();
     setShowProfile(false);
     setNotifications([]);
     setShowNotifications(false);
@@ -1677,30 +1684,111 @@ function App() {
     setGlassmorphismIntensity(80);
     setDarkMode(true);
     setPendingAnalyses([]);
+    setGoogleAuthError(null);
+    setGoogleBusy(false);
   };
 
-  // Initialize Google Sign-In button
+  const handleGoogleSignIn = useCallback(async () => {
+    const generation = ++loginGenerationRef.current;
+    setGoogleAuthError(null);
+    setGoogleBusy(true);
+    try {
+      if (isOffline()) {
+        const error = new Error('No internet connection');
+        error.code = 'network';
+        throw error;
+      }
+
+      if (isNativePlatform(Capacitor)) {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        const idToken = await signInWithNativeGoogle({
+          SocialLogin,
+          webClientId: GOOGLE_WEB_CLIENT_ID,
+        });
+        if (generation !== loginGenerationRef.current) return;
+        handleCredentialResponse({ credential: idToken });
+        return;
+      }
+
+      const officialBtn = document.querySelector('#google-signin-btn-container [role="button"]');
+      if (officialBtn) {
+        officialBtn.click();
+        return;
+      }
+
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt((notification) => {
+          if (generation !== loginGenerationRef.current) return;
+          try {
+            if (notification?.isDismissedMoment?.()) {
+              setGoogleAuthError(classifyGoogleAuthError({ code: 'USER_CANCELLED', message: 'cancelled' }));
+            } else if (notification?.isNotDisplayed?.()) {
+              const reason = notification.getNotDisplayedReason?.() || 'Google sign-in is unavailable';
+              setGoogleAuthError(classifyGoogleAuthError({ message: reason }));
+            }
+          } catch (promptError) {
+            setGoogleAuthError(classifyGoogleAuthError(promptError));
+          } finally {
+            setGoogleBusy(false);
+          }
+        });
+        return;
+      }
+
+      const error = new Error('Google Sign-In is still loading. Retry in a moment.');
+      error.code = 'plugin_init';
+      throw error;
+    } catch (error) {
+      console.error('Google sign-in failed', error);
+      setGoogleAuthError(classifyGoogleAuthError(error));
+    } finally {
+      setGoogleBusy(false);
+    }
+  }, [handleCredentialResponse]);
+
+  // Native plugin warmup so the first tap is ready; Guest stays available if this fails.
   useEffect(() => {
-    if (currentUser) return;
+    if (currentUser || !isNativePlatform(Capacitor)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { SocialLogin } = await import('@capgo/capacitor-social-login');
+        await initializeNativeGoogleSignIn(SocialLogin, GOOGLE_WEB_CLIENT_ID);
+      } catch (error) {
+        if (!cancelled) {
+          setGoogleAuthError(classifyGoogleAuthError({
+            message: error?.message || 'plugin initialize failed',
+          }));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
+
+  // Web-only Google Identity Services — unchanged website path. Never initialize GSI in the Android WebView.
+  useEffect(() => {
+    if (currentUser || isNativePlatform(Capacitor)) return;
 
     const initGoogleSignIn = () => {
       if (window.google) {
         try {
           window.google.accounts.id.initialize({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+            client_id: GOOGLE_WEB_CLIENT_ID,
             callback: handleCredentialResponse,
             auto_select: false,
             cancel_on_tap_outside: true
           });
-          
+
           const btnParent = document.getElementById("google-signin-btn-container");
           if (btnParent) {
             window.google.accounts.id.renderButton(
               btnParent,
-              { 
-                theme: "filled_blue", 
-                size: "large", 
-                text: "signin_with", 
+              {
+                theme: "filled_blue",
+                size: "large",
+                text: "signin_with",
                 shape: "rectangular",
                 width: 320
               }
@@ -1708,6 +1796,9 @@ function App() {
           }
         } catch (err) {
           console.error("Error rendering Google Sign-In button:", err);
+          setGoogleAuthError(classifyGoogleAuthError({
+            message: err?.message || 'plugin initialize failed',
+          }));
         }
       }
     };
@@ -1789,156 +1880,16 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div className="login-container">
-        <div className="login-card glass-card animate-fade-in">
-          <div className="login-header">
-            <div className="logo-wrapper" style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-              <FlaskConical className="logo-icon" size={32} />
-              <span className="logo-text">AURA</span>
-            </div>
-            <h2>Biomedical Intelligence Engine</h2>
-            <p className="subtitle">Secure Google Account Authentication</p>
-          </div>
-
-          {isLoggingIn ? (
-            <div className="login-loading">
-              <Loader2 className="animate-spin accent-spinner" size={40} />
-              <p>Authenticating credentials...</p>
-            </div>
-          ) : (
-            <div className="login-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="google-signin-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <p className="login-instruction" style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Sign in with your Google Account:
-                </p>
-                <div id="google-signin-btn-container" style={{ display: 'flex', justifyContent: 'center', minHeight: '44px', width: '100%', maxWidth: '320px', marginBottom: '8px' }}></div>
-
-                <button 
-                  type="button"
-                  className="google-signin-custom-btn"
-                  onClick={() => {
-                    if (window.google && window.google.accounts && window.google.accounts.id) {
-                      try {
-                        window.google.accounts.id.prompt();
-                      } catch (e) {
-                        console.log("Google prompt fallback", e);
-                        handleMockLogin({
-                          email: 'google.researcher@aura-biomedical.com',
-                          name: 'Google Researcher',
-                          role: 'Google Authenticated',
-                          avatarSeed: 'google_user',
-                          isGoogle: true
-                        });
-                      }
-                    } else {
-                      handleMockLogin({
-                        email: 'google.researcher@aura-biomedical.com',
-                        name: 'Google Researcher',
-                        role: 'Google Authenticated',
-                        avatarSeed: 'google_user',
-                        isGoogle: true
-                      });
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    maxWidth: '320px',
-                    height: '46px',
-                    backgroundColor: '#ffffff',
-                    color: '#3c4043',
-                    border: '1px solid #dadce0',
-                    borderRadius: '24px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                    transition: 'all 0.2s ease',
-                    marginBottom: '8px'
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.617z" fill="#4285F4"/>
-                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-                    <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-                  </svg>
-                  <span>Sign in with Google</span>
-                </button>
-                
-                {(!import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com") && (
-                  <div className="client-id-notice glass-card" style={{ padding: '12px 14px', fontSize: '11px', color: 'var(--text-muted)', border: '1px dashed rgba(139, 92, 246, 0.4)', borderRadius: '10px', marginTop: '12px', textAlign: 'left', lineHeight: '1.4', width: '100%', maxWidth: '340px' }}>
-                    <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>Setup Guide:</span> A custom Google Client ID is not configured. To authorize real Google logins, add a <code>.env</code> file in the project root:
-                    <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 8px', borderRadius: '6px', margin: '8px 0', fontFamily: 'monospace', fontSize: '10px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
-                    </pre>
-                    Authorize <code>http://localhost:5173</code> in the Google Cloud Console origins.
-                  </div>
-                )}
-              </div>
-
-              <div className="divider-or" style={{ margin: '12px 0 8px 0' }}>
-                <span>or</span>
-              </div>
-
-              <div className="guest-signin-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <button 
-                  type="button"
-                  className="guest-login-btn glass-card"
-                  onClick={() => handleMockLogin({
-                    email: 'guest@aurabiomedical.org',
-                    name: 'Guest Scientist',
-                    role: 'Standard Access',
-                    avatarSeed: 'guest_scientist',
-                    isGoogle: false
-                  })}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    width: '100%',
-                    maxWidth: '320px',
-                    height: '44px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '24px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <FlaskConical size={18} style={{ color: 'var(--accent-primary)' }} />
-                  <span>Continue as Guest Scientist</span>
-                </button>
-              </div>
-
-              <div className="divider-or" style={{ margin: '12px 0 8px 0' }}>
-                <span>or enter your email</span>
-              </div>
-
-              <form onSubmit={handleCustomLogin} className="custom-login-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-                <input 
-                  type="email" 
-                  placeholder="name@organization.com" 
-                  required
-                  className="custom-login-input glass-card"
-                  style={{ width: '100%', maxWidth: '320px', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#fff' }}
-                />
-                <button type="submit" className="custom-sign-in-btn" style={{ width: '100%', maxWidth: '320px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent-primary), #6366f1)', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>
-                  <span>Sign In with Email</span>
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-      </div>
+      <LoginScreen
+        googleBusy={googleBusy}
+        localBusy={isLoggingIn}
+        googleAuthError={googleAuthError}
+        showHiddenGsiButton={!isNativePlatform(Capacitor)}
+        onGoogleSignIn={handleGoogleSignIn}
+        onGuestContinue={handleGuestContinue}
+        onEmailSignIn={handleCustomLogin}
+        onRetryGoogle={handleGoogleSignIn}
+      />
     );
   }
 
