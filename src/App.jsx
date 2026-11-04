@@ -5107,6 +5107,9 @@ function SettingsView({ glassmorphismIntensity, setGlassmorphismIntensity, darkM
   );
 }
 
+const CONTACT_SUCCESS_MESSAGE = "Thanks, your message was sent. We'll get back to you soon.";
+const CONTACT_ERROR_MESSAGE = "Sorry, your message didn't send. Please try again.";
+
 function ContactView({ addNotification }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -5116,6 +5119,16 @@ function ContactView({ addNotification }) {
   const [status, setStatus] = useState('idle'); // 'idle' | 'sending' | 'success' | 'error'
   const [statusMessage, setStatusMessage] = useState('');
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LdPOQ8uAAAAAF5b3EIe6SfkWSUw4ybXlv824SB_';
+
+  const dismissFormStatus = useCallback(() => {
+    setStatus((current) => (current === 'success' || current === 'error' ? 'idle' : current));
+    setStatusMessage('');
+  }, []);
+
+  const editField = (setter) => (e) => {
+    dismissFormStatus();
+    setter(e.target.value);
+  };
 
   useEffect(() => {
     // Check if script is already present
@@ -5129,6 +5142,15 @@ function ContactView({ addNotification }) {
       document.body.appendChild(script);
     }
   }, [siteKey]);
+
+  useEffect(() => {
+    if (status !== 'success') return undefined;
+    const timer = setTimeout(() => {
+      setStatus('idle');
+      setStatusMessage('');
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -5197,18 +5219,19 @@ function ContactView({ addNotification }) {
             'success'
           );
         }
+        setStatusMessage(CONTACT_SUCCESS_MESSAGE);
         setName('');
         setEmail('');
         setSubject('');
         setMessage('');
       } else {
         setStatus('error');
-        setStatusMessage('Failed to send your message. Please try again.');
+        setStatusMessage(CONTACT_ERROR_MESSAGE);
       }
     } catch (error) {
       console.error(error);
       setStatus('error');
-      setStatusMessage('An unexpected error occurred. Please verify your connection.');
+      setStatusMessage(CONTACT_ERROR_MESSAGE);
     }
   };
 
@@ -5221,29 +5244,15 @@ function ContactView({ addNotification }) {
         </div>
       </header>
 
-      <div className="contact-container">
+      <div className="contact-container" id="contact">
         <div className="glass-card contact-card">
-          {status === 'success' && (
-            <div className="contact-alert success animate-fade-in">
-              <h4>Message Sent!</h4>
-              <p>Thank you for reaching out. We will get back to you shortly.</p>
-            </div>
-          )}
-          
-          {status === 'error' && (
-            <div className="contact-alert error animate-fade-in">
-              <h4>Submission Error</h4>
-              <p>{statusMessage}</p>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="contact-form">
             <div className="form-group">
               <label>Name <span className="required-star">*</span></label>
               <input 
                 type="text" 
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={editField(setName)}
                 placeholder="Enter your name"
                 required
                 disabled={status === 'sending'}
@@ -5256,7 +5265,7 @@ function ContactView({ addNotification }) {
               <input 
                 type="email" 
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={editField(setEmail)}
                 placeholder="you@example.com"
                 required
                 disabled={status === 'sending'}
@@ -5269,7 +5278,7 @@ function ContactView({ addNotification }) {
                 <label>Category</label>
                 <select 
                   value={category}
-                  onChange={e => setCategory(e.target.value)}
+                  onChange={editField(setCategory)}
                   disabled={status === 'sending'}
                   className="contact-select"
                 >
@@ -5284,7 +5293,7 @@ function ContactView({ addNotification }) {
                 <input 
                   type="text" 
                   value={subject}
-                  onChange={e => setSubject(e.target.value)}
+                  onChange={editField(setSubject)}
                   placeholder="Subject of message (optional)"
                   disabled={status === 'sending'}
                   className="custom-login-input"
@@ -5296,7 +5305,7 @@ function ContactView({ addNotification }) {
               <label>Message <span className="required-star">*</span></label>
               <textarea 
                 value={message}
-                onChange={e => setMessage(e.target.value)}
+                onChange={editField(setMessage)}
                 placeholder="How can we help you?"
                 required
                 rows={5}
@@ -5311,21 +5320,31 @@ function ContactView({ addNotification }) {
               </p>
             </div>
 
-            <button 
-              type="submit" 
-              className="primary-button submit-btn"
-              disabled={status === 'sending'}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '200px', height: '42px' }}
-            >
-              {status === 'sending' ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  <span>Sending...</span>
-                </>
-              ) : (
-                <span>Send Message</span>
+            <div className="contact-submit-row">
+              <button 
+                type="submit" 
+                className="primary-button submit-btn"
+                disabled={status === 'sending'}
+              >
+                {status === 'sending' ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <span>Send Message</span>
+                )}
+              </button>
+              {(status === 'success' || status === 'error') && statusMessage && (
+                <p
+                  className={`contact-form-status ${status}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {statusMessage}
+                </p>
               )}
-            </button>
+            </div>
           </form>
         </div>
 
