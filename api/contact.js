@@ -31,7 +31,14 @@ export default async function handler(req, res) {
     }
 
     // 1. Verify reCAPTCHA token using siteverify API
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || '6LdyIQ8tAAAAAP1Cz8k4OW0-LD1o6fmKTggDG7-E';
+    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+    if (!recaptchaSecret) {
+      console.error('RECAPTCHA_SECRET_KEY is not set; refusing contact submission');
+      return res.status(500).json({
+        status: 'error',
+        message: 'Contact form is temporarily unavailable. Please try again later.'
+      });
+    }
     const siteverifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
 
     const recaptchaResponse = await fetch(siteverifyUrl, {
