@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = false
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+    def storeFilePath = keystoreProperties['storeFile']
+    hasReleaseKeystore = storeFilePath &&
+        keystoreProperties['storePassword'] &&
+        keystoreProperties['keyAlias'] &&
+        keystoreProperties['keyPassword'] &&
+        rootProject.file(storeFilePath).exists()
+    if (!hasReleaseKeystore) {
+        logger.warn('android/keystore.properties is present but incomplete or storeFile is missing; release builds will be unsigned')
+    }
+}
+
 android {
     namespace = "com.redplanetapps.aurabiomedical"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -17,16 +33,20 @@ android {
         }
     }
     signingConfigs {
-        release {
-            storeFile file('aura-release-key.jks')
-            storePassword 'aura2026release'
-            keyAlias 'aura-release-alias'
-            keyPassword 'aura2026release'
+        if (hasReleaseKeystore) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

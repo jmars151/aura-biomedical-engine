@@ -49,6 +49,8 @@ api/library_db.json
 # Android Security & Build Outputs
 *.jks
 *.keystore
+keystore.properties
+android/keystore.properties
 local.properties
 android/app/build/
 android/build/
