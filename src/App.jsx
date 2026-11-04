@@ -5115,7 +5115,7 @@ function ContactView({ addNotification }) {
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'sending' | 'success' | 'error'
   const [statusMessage, setStatusMessage] = useState('');
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LdyIQ8tAAAAAMxR5Vgt48zeaI-AAhb8fkB6Dpod';
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LdPOQ8uAAAAAF5b3EIe6SfkWSUw4ybXlv824SB_';
 
   useEffect(() => {
     // Check if script is already present
